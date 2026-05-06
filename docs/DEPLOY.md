@@ -9,11 +9,27 @@ cp /usr/local/s-ui/db/s-ui.db /usr/local/s-ui/db/s-ui.db.bak
 ## 2. 拉取项目
 
 ```bash
-git clone https://github.com/your-name/sui-traffic-reset.git
+git clone https://github.com/oldwangnewbe/sui-traffic-reset.git
 cd sui-traffic-reset
 ```
 
-## 3. 配置环境变量
+## 3. 一键部署
+
+```bash
+./install.sh
+```
+
+脚本会自动：
+
+- 检查 Docker Compose
+- 生成 `.env`
+- 备份 `s-ui.db`
+- 构建并启动容器
+- 打印 Web 地址和 Token
+
+如果你想手动配置，继续按下面步骤操作。
+
+## 4. 配置环境变量
 
 ```bash
 cp .env.example .env
@@ -32,13 +48,13 @@ RESET_WEB_TOKEN=your-strong-token
 SUI_DB_DIR=/path/to/s-ui/db
 ```
 
-## 4. 启动
+## 5. 启动
 
 ```bash
 docker compose up -d --build
 ```
 
-## 5. 访问
+## 6. 访问
 
 默认只监听服务器本机：
 
@@ -58,7 +74,7 @@ RESET_WEB_BIND=0.0.0.0:8787
 docker compose up -d
 ```
 
-## 6. 更新
+## 7. 更新
 
 ```bash
 git pull

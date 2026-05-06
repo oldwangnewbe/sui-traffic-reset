@@ -29,10 +29,18 @@
 /usr/local/s-ui/db/s-ui.db
 ```
 
-部署：
+一键 Docker Compose 部署：
 
 ```bash
-git clone https://github.com/your-name/sui-traffic-reset.git
+git clone https://github.com/oldwangnewbe/sui-traffic-reset.git
+cd sui-traffic-reset
+./install.sh
+```
+
+手动部署：
+
+```bash
+git clone https://github.com/oldwangnewbe/sui-traffic-reset.git
 cd sui-traffic-reset
 cp .env.example .env
 nano .env
@@ -60,6 +68,8 @@ http://服务器IP:8787
 ```
 
 ## Docker Compose 配置
+
+项目内置 [docker-compose.yml](./docker-compose.yml)。`install.sh` 会自动生成 `.env`、备份数据库并执行 `docker compose up -d --build`。
 
 `.env.example`：
 

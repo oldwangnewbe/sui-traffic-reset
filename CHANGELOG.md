@@ -8,3 +8,4 @@
 - Expiry time management.
 - Monthly and interval-based scheduled reset rules.
 - Docker Compose deployment.
+- One-command Docker Compose install script.
