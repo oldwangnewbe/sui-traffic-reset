@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>s-ui 流量重置</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f5f8;
+      --panel: #ffffff;
+      --text: #171a1f;
+      --muted: #68707c;
+      --line: #dfe3e8;
+      --line-soft: #edf0f3;
+      --primary: #1267d3;
+      --primary-dark: #0b54ad;
+      --danger: #c83232;
+      --ok: #177245;
+      --warn: #a16012;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      background: rgba(255, 255, 255, .96);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      backdrop-filter: blur(10px);
+    }
+    h1 { font-size: 18px; margin: 0; }
+    .brand {
+      display: grid;
+      gap: 2px;
+    }
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    main {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      gap: 18px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(20, 35, 60, .045);
+    }
+    h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      display: grid;
+      gap: 6px;
+      min-width: 220px;
+    }
+    .toolbar, .form-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: end;
+    }
+    .header-tools {
+      align-items: center;
+    }
+    label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    input, select, button {
+      height: 36px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      padding: 0 11px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+    }
+    input, select {
+      min-width: 140px;
+    }
+    input:disabled {
+      background: #f5f7f9;
+      color: #9aa3ad;
+      cursor: not-allowed;
+    }
+    input[type="checkbox"] {
+      height: auto;
+      width: auto;
+    }
+    button {
+      border-color: transparent;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+      box-shadow: 0 1px 1px rgba(10, 65, 130, .08);
+    }
+    button:hover { background: var(--primary-dark); }
+    button.secondary {
+      background: #eef3f8;
+      color: var(--primary-dark);
+      border-color: #cbd8e5;
+      box-shadow: none;
+    }
+    button.ghost {
+      background: #fff;
+      color: #405064;
+      border-color: var(--line);
+      box-shadow: none;
+    }
+    button.danger { background: var(--danger); }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid rgba(11, 101, 194, .22);
+      outline-offset: 2px;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 250px;
+    }
+    .actions button {
+      height: 32px;
+      padding: 0 9px;
+    }
+    .status {
+      color: var(--muted);
+      min-height: 22px;
+    }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      gap: 10px;
+      margin: 8px 0 14px;
+    }
+    .metric {
+      border: 1px solid var(--line-soft);
+      background: #fbfcfe;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: grid;
+      gap: 4px;
+    }
+    .metric span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .metric strong {
+      font-size: 18px;
+      line-height: 1.1;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 11px 8px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+      background: #fbfcfe;
+    }
+    tbody tr:hover td {
+      background: #fbfcfd;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .table-wrap table tr:last-child td {
+      border-bottom: 0;
+    }
+    .usage {
+      display: grid;
+      gap: 5px;
+      min-width: 180px;
+    }
+    .bar {
+      height: 6px;
+      background: var(--line-soft);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar span {
+      display: block;
+      height: 100%;
+      background: var(--primary);
+    }
+    .usage-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      white-space: nowrap;
+    }
+    .usage-percent {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #eef3f8;
+      color: var(--primary-dark);
+      white-space: nowrap;
+    }
+    .badge.off {
+      background: #f7eaea;
+      color: var(--danger);
+    }
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 32px 8px;
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    dialog {
+      width: min(440px, calc(100vw - 32px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0;
+      color: var(--text);
+      box-shadow: 0 18px 55px rgba(28, 39, 54, .2);
+    }
+    dialog::backdrop {
+      background: rgba(17, 24, 39, .35);
+    }
+    .dialog-body {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .dialog-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 860px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .section-head { flex-direction: column; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .split { grid-template-columns: 1fr; }
+      .dialog-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      main { padding: 14px; }
+      section { padding: 14px; }
+      .metrics { grid-template-columns: 1fr; }
+      .toolbar { width: 100%; }
+      .toolbar label, .toolbar input { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>s-ui 流量重置</h1>
+      <div class="brand-subtitle">用户流量、到期时间与定时重置</div>
+    </div>
+    <div class="toolbar header-tools">
+      <label>访问 Token
+        <input id="token" type="password" placeholder="RESET_WEB_TOKEN">
+      </label>
+      <button class="secondary" id="saveToken">保存</button>
+      <button id="refresh">刷新</button>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="section-head">
+        <div class="section-title">
+          <h2>用户流量</h2>
+          <div id="status" class="status"></div>
+        </div>
+        <div class="toolbar">
+          <label>搜索
+            <input id="search" placeholder="用户名或组">
+          </label>
+          <button class="secondary" id="ruleFiltered">筛选定时重置</button>
+          <button class="secondary" id="runDue">执行到期</button>
+          <button class="danger" id="resetAll">重置全部</button>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric">
+          <span>用户</span>
+          <strong id="metricClients">-</strong>
+        </div>
+        <div class="metric">
+          <span>自动规则</span>
+          <strong id="metricRules">-</strong>
+        </div>
+        <div class="metric">
+          <span>停用用户</span>
+          <strong id="metricDisabled">-</strong>
+        </div>
+        <div class="metric">
+          <span>总已用</span>
+          <strong id="metricUsed">-</strong>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>组</th>
+              <th>状态</th>
+              <th>流量</th>
+              <th>到期</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="clientsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div class="section-title">
+          <h2>自动规则</h2>
+          <div class="status">到达下次重置时间后，后台服务会自动执行。</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>目标</th>
+              <th>周期</th>
+              <th>下次重置</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="rulesBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="ruleDialog">
+    <div class="dialog-body">
+      <h2 style="margin:0">定时重置</h2>
+      <div class="status">当前目标：<strong id="ruleTargetLabel"></strong></div>
+      <div class="dialog-grid">
+        <label>周期
+          <select id="ruleCycle">
+            <option value="monthly">每月</option>
+            <option value="days">每 N 天</option>
+          </select>
+        </label>
+        <label>每月几号
+          <input id="ruleDayOfMonth" type="number" min="1" max="31" value="1">
+        </label>
+        <label>间隔天数
+          <input id="ruleIntervalDays" type="number" min="1" value="30">
+        </label>
+        <label>时间
+          <input id="ruleTime" value="00:00" placeholder="HH:MM">
+        </label>
+        <label>时区
+          <input id="ruleTimezone" value="Asia/Shanghai">
+        </label>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px">
+        <input id="ruleEnableAfterReset" type="checkbox" checked>
+        重置后重新启用
+      </label>
+      <div class="dialog-actions">
+        <button class="secondary" id="ruleCancel">取消</button>
+        <button id="ruleSave">保存定时重置</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="expiryDialog">
+    <div class="dialog-body">
+      <h2 style="margin:0">设置到期时间</h2>
+      <div class="status">当前用户：<strong id="expiryClientName"></strong></div>
+      <label>到期时间
+        <input id="expiryInput" type="datetime-local">
+      </label>
+      <label style="display:flex;align-items:center;gap:8px">
+        <input id="expiryEnable" type="checkbox" checked>
+        如果未过期，保存后启用用户
+      </label>
+      <div class="dialog-actions">
+        <button class="secondary" id="expiryCancel">取消</button>
+        <button class="secondary" id="expiryUnlimited">设为无限</button>
+        <button id="expirySave">保存</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    const state = { clients: [], rules: [], expiryClient: null, ruleTargets: [] };
+    const els = {
+      token: document.querySelector('#token'),
+      status: document.querySelector('#status'),
+      clientsBody: document.querySelector('#clientsBody'),
+      rulesBody: document.querySelector('#rulesBody'),
+      search: document.querySelector('#search'),
+      metricClients: document.querySelector('#metricClients'),
+      metricRules: document.querySelector('#metricRules'),
+      metricDisabled: document.querySelector('#metricDisabled'),
+      metricUsed: document.querySelector('#metricUsed'),
+      ruleDialog: document.querySelector('#ruleDialog'),
+      ruleTargetLabel: document.querySelector('#ruleTargetLabel'),
+      ruleCycle: document.querySelector('#ruleCycle'),
+      ruleDayOfMonth: document.querySelector('#ruleDayOfMonth'),
+      ruleIntervalDays: document.querySelector('#ruleIntervalDays'),
+      ruleTime: document.querySelector('#ruleTime'),
+      ruleTimezone: document.querySelector('#ruleTimezone'),
+      ruleEnableAfterReset: document.querySelector('#ruleEnableAfterReset'),
+      expiryDialog: document.querySelector('#expiryDialog'),
+      expiryClientName: document.querySelector('#expiryClientName'),
+      expiryInput: document.querySelector('#expiryInput'),
+      expiryEnable: document.querySelector('#expiryEnable'),
+    };
+
+    els.token.value = localStorage.getItem('resetToken') || '';
+
+    function setStatus(text, type = '') {
+      els.status.textContent = text;
+      els.status.className = 'status ' + type;
+    }
+
+    async function api(path, options = {}) {
+      const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+      const token = localStorage.getItem('resetToken') || els.token.value;
+      if (token) headers['X-Reset-Token'] = token;
+      const res = await fetch(path, Object.assign({}, options, { headers }));
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || '请求失败');
+      return data;
+    }
+
+    function expiryText(ts) {
+      if (!ts) return '无限';
+      return new Date(ts * 1000).toLocaleString();
+    }
+
+    function percent(client) {
+      if (!client.volume) return 0;
+      return Math.min(100, Math.round(client.used * 100 / client.volume));
+    }
+
+    function sizeFormat(value) {
+      const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+      let size = Number(value || 0);
+      for (const unit of units) {
+        if (Math.abs(size) < 1024 || unit === units[units.length - 1]) {
+          return `${size.toFixed(2)} ${unit}`;
+        }
+        size /= 1024;
+      }
+      return `${size.toFixed(2)} TiB`;
+    }
+
+    function updateMetrics() {
+      const used = state.clients.reduce((sum, client) => sum + Number(client.used || 0), 0);
+      const disabled = state.clients.filter(client => !client.enable).length;
+      els.metricClients.textContent = state.clients.length;
+      els.metricRules.textContent = state.rules.length;
+      els.metricDisabled.textContent = disabled;
+      els.metricUsed.textContent = sizeFormat(used);
+    }
+
+    function filteredClients() {
+      const q = els.search.value.trim().toLowerCase();
+      return state.clients.filter(c => !q || c.name.toLowerCase().includes(q) || (c.group || '').toLowerCase().includes(q));
+    }
+
+    function renderClients() {
+      const rows = filteredClients();
+      if (!rows.length) {
+        els.clientsBody.innerHTML = '<tr><td class="empty" colspan="6">没有匹配的用户</td></tr>';
+        return;
+      }
+      els.clientsBody.innerHTML = rows.map(c => `
+        <tr>
+          <td>${escapeHtml(c.name)}</td>
+          <td>${escapeHtml(c.group || '-')}</td>
+          <td><span class="badge ${c.enable ? '' : 'off'}">${c.enable ? '启用' : '停用'}</span></td>
+          <td>
+            <div class="usage">
+              <div class="usage-line">
+                <span>${c.usedText} / ${c.volumeText}</span>
+                <span class="usage-percent">${c.volume ? percent(c) + '%' : '无限'}</span>
+              </div>
+              <div class="bar"><span style="width:${percent(c)}%"></span></div>
+            </div>
+          </td>
+          <td>${expiryText(c.expiry)}</td>
+          <td>
+            <div class="actions">
+              <button class="ghost" data-reset="${escapeAttr(c.name)}">重置</button>
+              <button data-rule="${escapeAttr(c.name)}">定时重置</button>
+              <button class="secondary" data-expiry="${escapeAttr(c.name)}">到期</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.clientsBody.querySelectorAll('[data-reset]').forEach(btn => {
+        btn.addEventListener('click', () => resetTarget('client', btn.dataset.reset));
+      });
+      els.clientsBody.querySelectorAll('[data-rule]').forEach(btn => {
+        btn.addEventListener('click', () => openRuleDialogForClient(btn.dataset.rule));
+      });
+      els.clientsBody.querySelectorAll('[data-expiry]').forEach(btn => {
+        btn.addEventListener('click', () => openExpiryDialog(btn.dataset.expiry));
+      });
+    }
+
+    function renderRules() {
+      if (!state.rules.length) {
+        els.rulesBody.innerHTML = '<tr><td class="empty" colspan="4">暂无自动规则</td></tr>';
+        return;
+      }
+      els.rulesBody.innerHTML = state.rules.map(r => {
+        const cycle = r.cycle === 'monthly' ? `每月 ${r.dayOfMonth} 号 ${r.time}` : `每 ${r.intervalDays} 天 ${r.time}`;
+        const target = r.targetType === 'all' ? '全部用户' : `${r.targetType === 'client' ? '用户' : '组'}：${escapeHtml(r.targetValue)}`;
+        return `
+          <tr>
+            <td>${target}</td>
+            <td>${cycle}<br><span style="color:var(--muted)">${escapeHtml(r.timezone)}</span></td>
+            <td>${escapeHtml(r.nextResetText)}</td>
+            <td><button class="danger" data-delete="${r.id}">删除</button></td>
+          </tr>
+        `;
+      }).join('');
+      els.rulesBody.querySelectorAll('[data-delete]').forEach(btn => {
+        btn.addEventListener('click', () => deleteRule(btn.dataset.delete));
+      });
+    }
+
+    async function loadAll() {
+      setStatus('正在加载...');
+      const [clients, rules] = await Promise.all([api('/api/clients'), api('/api/rules')]);
+      state.clients = clients.clients;
+      state.rules = rules.rules;
+      updateMetrics();
+      renderClients();
+      renderRules();
+      setStatus(`已加载 ${state.clients.length} 个用户、${state.rules.length} 条规则`, 'ok');
+    }
+
+    async function resetTarget(targetType, targetValue = '') {
+      const label = targetType === 'all' ? '全部用户' : targetValue;
+      if (!confirm(`确定重置 ${label} 的流量？`)) return;
+      const data = await api('/api/reset', {
+        method: 'POST',
+        body: JSON.stringify({ targetType, targetValue, enableAfterReset: true })
+      });
+      setStatus(data.output || `已重置 ${data.count} 个用户`, 'ok');
+      await loadAll();
+    }
+
+    function currentRulePayload(targetValue) {
+      return {
+        targetType: 'client',
+        targetValue,
+        cycle: els.ruleCycle.value,
+        dayOfMonth: Number(els.ruleDayOfMonth.value),
+        intervalDays: Number(els.ruleIntervalDays.value),
+        time: els.ruleTime.value.trim(),
+        timezone: els.ruleTimezone.value.trim(),
+        enableAfterReset: els.ruleEnableAfterReset.checked,
+      };
+    }
+
+    function openRuleDialogForClient(name) {
+      state.ruleTargets = [name];
+      els.ruleTargetLabel.textContent = `用户：${name}`;
+      updateRuleFieldState();
+      els.ruleDialog.showModal();
+    }
+
+    function openRuleDialogForFiltered() {
+      const rows = filteredClients();
+      if (!rows.length) {
+        setStatus('当前筛选没有匹配用户', 'err');
+        return;
+      }
+      state.ruleTargets = rows.map(c => c.name);
+      els.ruleTargetLabel.textContent = `筛选用户：${rows.length} 个`;
+      updateRuleFieldState();
+      els.ruleDialog.showModal();
+    }
+
+    function updateRuleFieldState() {
+      const isMonthly = els.ruleCycle.value === 'monthly';
+      els.ruleDayOfMonth.disabled = !isMonthly;
+      els.ruleIntervalDays.disabled = isMonthly;
+    }
+
+    async function saveRuleFromDialog() {
+      if (!state.ruleTargets.length) {
+        setStatus('没有选择定时重置目标', 'err');
+        return;
+      }
+      let lastNextReset = '';
+      for (const name of state.ruleTargets) {
+        const payload = currentRulePayload(name);
+        const data = await api('/api/rules', { method: 'POST', body: JSON.stringify(payload) });
+        lastNextReset = data.nextResetText;
+      }
+      const count = state.ruleTargets.length;
+      els.ruleDialog.close();
+      state.ruleTargets = [];
+      setStatus(`已给 ${count} 个用户保存定时重置，下次重置：${lastNextReset}`, 'ok');
+      await loadAll();
+    }
+
+    function datetimeLocalValue(ts) {
+      if (!ts) return '';
+      const date = new Date(ts * 1000);
+      const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 16);
+    }
+
+    function openExpiryDialog(name) {
+      const client = state.clients.find(c => c.name === name);
+      if (!client) return;
+      state.expiryClient = client;
+      els.expiryClientName.textContent = client.name;
+      els.expiryInput.value = datetimeLocalValue(client.expiry);
+      els.expiryEnable.checked = true;
+      els.expiryDialog.showModal();
+    }
+
+    async function saveExpiry(expiry) {
+      if (!state.expiryClient) return;
+      const data = await api('/api/expiry', {
+        method: 'POST',
+        body: JSON.stringify({
+          targetType: 'client',
+          targetValue: state.expiryClient.name,
+          expiry,
+          enableAfterUpdate: els.expiryEnable.checked,
+        })
+      });
+      els.expiryDialog.close();
+      setStatus(data.output || `已更新 ${state.expiryClient.name} 的到期时间`, 'ok');
+      state.expiryClient = null;
+      await loadAll();
+    }
+
+    async function saveExpiryFromInput() {
+      if (!els.expiryInput.value) {
+        setStatus('请选择到期时间，或点击“设为无限”', 'err');
+        return;
+      }
+      const ts = Math.floor(new Date(els.expiryInput.value).getTime() / 1000);
+      if (!Number.isFinite(ts) || ts < 0) {
+        setStatus('到期时间无效', 'err');
+        return;
+      }
+      await saveExpiry(ts);
+    }
+
+    async function deleteRule(id) {
+      if (!confirm('确定删除这条规则？')) return;
+      await api(`/api/rules/${id}`, { method: 'DELETE' });
+      setStatus('规则已删除', 'ok');
+      await loadAll();
+    }
+
+    async function runDue() {
+      const data = await api('/api/run-due', { method: 'POST', body: '{}' });
+      setStatus(data.output || '没有到期规则', 'ok');
+      await loadAll();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, '&#96;');
+    }
+
+    document.querySelector('#saveToken').addEventListener('click', () => {
+      localStorage.setItem('resetToken', els.token.value);
+      setStatus('Token 已保存', 'ok');
+      loadAll().catch(err => setStatus(err.message, 'err'));
+    });
+    document.querySelector('#refresh').addEventListener('click', () => loadAll().catch(err => setStatus(err.message, 'err')));
+    document.querySelector('#resetAll').addEventListener('click', () => resetTarget('all').catch(err => setStatus(err.message, 'err')));
+    document.querySelector('#ruleFiltered').addEventListener('click', () => openRuleDialogForFiltered());
+    document.querySelector('#runDue').addEventListener('click', () => runDue().catch(err => setStatus(err.message, 'err')));
+    document.querySelector('#ruleCancel').addEventListener('click', () => els.ruleDialog.close());
+    document.querySelector('#ruleSave').addEventListener('click', () => saveRuleFromDialog().catch(err => setStatus(err.message, 'err')));
+    els.ruleCycle.addEventListener('change', updateRuleFieldState);
+    document.querySelector('#expiryCancel').addEventListener('click', () => els.expiryDialog.close());
+    document.querySelector('#expiryUnlimited').addEventListener('click', () => saveExpiry(0).catch(err => setStatus(err.message, 'err')));
+    document.querySelector('#expirySave').addEventListener('click', () => saveExpiryFromInput().catch(err => setStatus(err.message, 'err')));
+    els.search.addEventListener('input', renderClients);
+
+    updateRuleFieldState();
+    loadAll().catch(err => setStatus(err.message + '，请填写并保存 Token', 'err'));
+  </script>
+</body>
+</html>

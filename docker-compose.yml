@@ -1,0 +1,16 @@
+services:
+  sui-traffic-reset:
+    build: .
+    image: sui-traffic-reset:local
+    container_name: sui-traffic-reset
+    restart: unless-stopped
+    environment:
+      SUI_DB: /data/s-ui.db
+      CHECK_INTERVAL: ${CHECK_INTERVAL:-60}
+      TZ: ${TZ:-Asia/Shanghai}
+      RESET_WEB_TOKEN: ${RESET_WEB_TOKEN:?please set RESET_WEB_TOKEN in .env}
+      RESET_WEB_PORT: 8080
+    ports:
+      - ${RESET_WEB_BIND:-127.0.0.1:8787}:8080
+    volumes:
+      - ${SUI_DB_DIR:-/usr/local/s-ui/db}:/data

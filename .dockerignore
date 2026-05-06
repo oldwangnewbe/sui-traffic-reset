@@ -1,0 +1,13 @@
+.git
+.env
+*.db
+*.db-wal
+*.db-shm
+__pycache__/
+*.py[cod]
+.DS_Store
+docs/
+README.md
+CHANGELOG.md
+SECURITY.md
+LICENSE
