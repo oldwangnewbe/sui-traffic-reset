@@ -30,6 +30,44 @@
 /usr/local/s-ui/db/s-ui.db
 ```
 
+无需 Git，直接在服务器新建 `docker-compose.yml`：
+
+```yaml
+# 版本选择：把镜像标签 v0.1.0 改成你想安装的 Release 版本。
+# 可用版本见：https://github.com/oldwangnewbe/sui-traffic-reset/releases
+services:
+  sui-traffic-reset:
+    image: ghcr.io/oldwangnewbe/sui-traffic-reset:v0.1.0
+    container_name: sui-traffic-reset
+    restart: unless-stopped
+    environment:
+      SUI_DB: /data/s-ui.db
+      CHECK_INTERVAL: 60
+      TZ: Asia/Shanghai
+      RESET_ADMIN_USER: admin
+      RESET_ADMIN_PASSWORD: please-change-this-password
+      RESET_WEB_PORT: 8080
+    ports:
+      # 默认只允许服务器本机访问；公网访问可改成 0.0.0.0:8787:8080
+      - 127.0.0.1:8787:8080
+    volumes:
+      # 如果 s-ui 数据库目录不是默认路径，请修改冒号左侧。
+      - /usr/local/s-ui/db:/data
+```
+
+至少修改两处：
+
+- `image` 里的版本号，例如 `v0.1.0`
+- `RESET_ADMIN_PASSWORD`
+
+然后启动：
+
+```bash
+docker compose up -d
+```
+
+下面是从源码部署的方式，适合想自己构建镜像或参与开发的人。
+
 一键 Docker Compose 部署：
 
 ```bash

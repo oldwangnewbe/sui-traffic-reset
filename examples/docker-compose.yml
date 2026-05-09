@@ -1,0 +1,20 @@
+# 版本选择：把镜像标签 v0.1.0 改成你想安装的 Release 版本。
+# 可用版本见：https://github.com/oldwangnewbe/sui-traffic-reset/releases
+services:
+  sui-traffic-reset:
+    image: ghcr.io/oldwangnewbe/sui-traffic-reset:v0.1.0
+    container_name: sui-traffic-reset
+    restart: unless-stopped
+    environment:
+      SUI_DB: /data/s-ui.db
+      CHECK_INTERVAL: 60
+      TZ: Asia/Shanghai
+      RESET_ADMIN_USER: admin
+      RESET_ADMIN_PASSWORD: please-change-this-password
+      RESET_WEB_PORT: 8080
+    ports:
+      # 默认只允许服务器本机访问；公网访问可改成 0.0.0.0:8787:8080
+      - 127.0.0.1:8787:8080
+    volumes:
+      # 如果 s-ui 数据库目录不是默认路径，请修改冒号左侧。
+      - /usr/local/s-ui/db:/data
