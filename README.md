@@ -33,11 +33,11 @@
 无需 Git，直接在服务器新建 `docker-compose.yml`：
 
 ```yaml
-# 版本选择：把镜像标签 v0.1.0 改成你想安装的 Release 版本。
+# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.1。
 # 可用版本见：https://github.com/oldwangnewbe/sui-traffic-reset/releases
 services:
   sui-traffic-reset:
-    image: ghcr.io/oldwangnewbe/sui-traffic-reset:v0.1.0
+    image: ghcr.io/oldwangnewbe/sui-traffic-reset:latest
     container_name: sui-traffic-reset
     restart: unless-stopped
     environment:
@@ -57,7 +57,7 @@ services:
 
 至少修改两处：
 
-- `image` 里的版本号，例如 `v0.1.0`
+- 如需固定版本，把 `image` 里的 `latest` 改成版本号，例如 `v0.1.1`
 - `RESET_ADMIN_PASSWORD`
 
 然后启动：
@@ -101,7 +101,7 @@ docker compose -f docker-compose.image.yml up -d
 指定版本时修改 `.env`：
 
 ```env
-SUI_TRAFFIC_RESET_VERSION=v0.1.0
+SUI_TRAFFIC_RESET_VERSION=v0.1.1
 ```
 
 默认 Web 入口只绑定本机：
@@ -202,18 +202,18 @@ docker compose run --rm sui-traffic-reset run-due
 
 ## 版本选择
 
-每个 GitHub Release 会对应一个 Git tag，例如 `v0.1.0`。你可以选择源码版本：
+每个 GitHub Release 会对应一个 Git tag，例如 `v0.1.1`。你可以选择源码版本：
 
 ```bash
 git fetch --tags
-git checkout v0.1.0
+git checkout v0.1.1
 docker compose up -d --build
 ```
 
 也可以选择已发布的 Docker 镜像版本：
 
 ```bash
-SUI_TRAFFIC_RESET_VERSION=v0.1.0 docker compose -f docker-compose.image.yml up -d
+SUI_TRAFFIC_RESET_VERSION=v0.1.1 docker compose -f docker-compose.image.yml up -d
 ```
 
 ## 安全建议

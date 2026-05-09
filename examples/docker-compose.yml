@@ -1,8 +1,8 @@
-# 版本选择：把镜像标签 v0.1.0 改成你想安装的 Release 版本。
+# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.1。
 # 可用版本见：https://github.com/oldwangnewbe/sui-traffic-reset/releases
 services:
   sui-traffic-reset:
-    image: ghcr.io/oldwangnewbe/sui-traffic-reset:v0.1.0
+    image: ghcr.io/oldwangnewbe/sui-traffic-reset:latest
     container_name: sui-traffic-reset
     restart: unless-stopped
     environment:

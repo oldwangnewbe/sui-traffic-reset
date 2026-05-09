@@ -11,11 +11,11 @@ cp /usr/local/s-ui/db/s-ui.db /usr/local/s-ui/db/s-ui.db.bak
 直接在服务器新建 `docker-compose.yml`：
 
 ```yaml
-# 版本选择：把镜像标签 v0.1.0 改成你想安装的 Release 版本。
+# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.1。
 # 可用版本见：https://github.com/oldwangnewbe/sui-traffic-reset/releases
 services:
   sui-traffic-reset:
-    image: ghcr.io/oldwangnewbe/sui-traffic-reset:v0.1.0
+    image: ghcr.io/oldwangnewbe/sui-traffic-reset:latest
     container_name: sui-traffic-reset
     restart: unless-stopped
     environment:
@@ -33,7 +33,7 @@ services:
       - /usr/local/s-ui/db:/data
 ```
 
-修改 `image` 里的版本号和 `RESET_ADMIN_PASSWORD` 后启动：
+默认会使用最新版。至少修改 `RESET_ADMIN_PASSWORD`；如果要锁定版本，再把 `image` 里的 `latest` 改成指定版本。
 
 ```bash
 docker compose up -d
@@ -100,7 +100,7 @@ docker compose -f docker-compose.image.yml up -d
 如果要选择固定版本，在 `.env` 里设置：
 
 ```env
-SUI_TRAFFIC_RESET_VERSION=v0.1.0
+SUI_TRAFFIC_RESET_VERSION=v0.1.1
 ```
 
 ## 7. 访问
@@ -138,12 +138,12 @@ docker compose up -d --build
 
 ```bash
 git fetch --tags
-git checkout v0.1.0
+git checkout v0.1.1
 docker compose up -d --build
 ```
 
 如果使用发布镜像，只需要修改 `.env` 中的版本并重启：
 
 ```bash
-SUI_TRAFFIC_RESET_VERSION=v0.1.0 docker compose -f docker-compose.image.yml up -d
+SUI_TRAFFIC_RESET_VERSION=v0.1.1 docker compose -f docker-compose.image.yml up -d
 ```
