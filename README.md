@@ -50,6 +50,22 @@ docker compose up -d --build
 
 请务必修改 `.env` 里的 `RESET_ADMIN_PASSWORD`。首次启动会自动创建或更新管理员账号。
 
+使用已发布版本镜像安装：
+
+```bash
+git clone https://github.com/oldwangnewbe/sui-traffic-reset.git
+cd sui-traffic-reset
+cp .env.example .env
+nano .env
+docker compose -f docker-compose.image.yml up -d
+```
+
+指定版本时修改 `.env`：
+
+```env
+SUI_TRAFFIC_RESET_VERSION=v0.1.0
+```
+
 默认 Web 入口只绑定本机：
 
 ```text
@@ -81,6 +97,7 @@ TZ=Asia/Shanghai
 RESET_ADMIN_USER=admin
 RESET_ADMIN_PASSWORD=please-change-this-password
 RESET_WEB_BIND=127.0.0.1:8787
+SUI_TRAFFIC_RESET_VERSION=latest
 ```
 
 字段说明：
@@ -93,6 +110,7 @@ RESET_WEB_BIND=127.0.0.1:8787
 | `RESET_WEB_BIND` | Web 服务绑定地址 |
 | `RESET_ADMIN_USER` | Web 管理员用户名 |
 | `RESET_ADMIN_PASSWORD` | Web 管理员密码 |
+| `SUI_TRAFFIC_RESET_VERSION` | 使用 `docker-compose.image.yml` 时拉取的镜像版本 |
 
 ## 常用命令
 
@@ -142,6 +160,22 @@ docker compose run --rm sui-traffic-reset rule-list
 
 ```bash
 docker compose run --rm sui-traffic-reset run-due
+```
+
+## 版本选择
+
+每个 GitHub Release 会对应一个 Git tag，例如 `v0.1.0`。你可以选择源码版本：
+
+```bash
+git fetch --tags
+git checkout v0.1.0
+docker compose up -d --build
+```
+
+也可以选择已发布的 Docker 镜像版本：
+
+```bash
+SUI_TRAFFIC_RESET_VERSION=v0.1.0 docker compose -f docker-compose.image.yml up -d
 ```
 
 ## 安全建议

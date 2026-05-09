@@ -1,0 +1,16 @@
+services:
+  sui-traffic-reset:
+    image: ghcr.io/oldwangnewbe/sui-traffic-reset:${SUI_TRAFFIC_RESET_VERSION:-latest}
+    container_name: sui-traffic-reset
+    restart: unless-stopped
+    environment:
+      SUI_DB: /data/s-ui.db
+      CHECK_INTERVAL: ${CHECK_INTERVAL:-60}
+      TZ: ${TZ:-Asia/Shanghai}
+      RESET_ADMIN_USER: ${RESET_ADMIN_USER:-admin}
+      RESET_ADMIN_PASSWORD: ${RESET_ADMIN_PASSWORD:?please set RESET_ADMIN_PASSWORD in .env}
+      RESET_WEB_PORT: 8080
+    ports:
+      - ${RESET_WEB_BIND:-127.0.0.1:8787}:8080
+    volumes:
+      - ${SUI_DB_DIR:-/usr/local/s-ui/db}:/data

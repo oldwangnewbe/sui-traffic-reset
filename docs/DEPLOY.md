@@ -50,8 +50,22 @@ SUI_DB_DIR=/path/to/s-ui/db
 
 ## 5. 启动
 
+本地构建安装：
+
 ```bash
 docker compose up -d --build
+```
+
+使用发布镜像安装：
+
+```bash
+docker compose -f docker-compose.image.yml up -d
+```
+
+如果要选择固定版本，在 `.env` 里设置：
+
+```env
+SUI_TRAFFIC_RESET_VERSION=v0.1.0
 ```
 
 ## 6. 访问
@@ -78,7 +92,23 @@ docker compose up -d
 
 ## 7. 更新
 
+更新到最新源码并重新构建：
+
 ```bash
 git pull
 docker compose up -d --build
+```
+
+切换到指定 Release：
+
+```bash
+git fetch --tags
+git checkout v0.1.0
+docker compose up -d --build
+```
+
+如果使用发布镜像，只需要修改 `.env` 中的版本并重启：
+
+```bash
+SUI_TRAFFIC_RESET_VERSION=v0.1.0 docker compose -f docker-compose.image.yml up -d
 ```
