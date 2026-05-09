@@ -29,7 +29,7 @@ compose_cmd() {
   exit 1
 }
 
-generate_token() {
+generate_password() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 24
     return
@@ -59,17 +59,28 @@ if [ ! -f "$DB_DIR/s-ui.db" ]; then
 fi
 
 if [ ! -f .env ]; then
-  TOKEN="$(generate_token)"
+  ADMIN_USER="${RESET_ADMIN_USER:-admin}"
+  ADMIN_PASSWORD="${RESET_ADMIN_PASSWORD:-$(generate_password)}"
   cat > .env <<EOF
 SUI_DB_DIR=$DB_DIR
 CHECK_INTERVAL=$CHECK_INTERVAL_VALUE
 TZ=$TZ_VALUE
-RESET_WEB_TOKEN=$TOKEN
+RESET_ADMIN_USER=$ADMIN_USER
+RESET_ADMIN_PASSWORD=$ADMIN_PASSWORD
 RESET_WEB_BIND=$WEB_BIND
 EOF
   echo "Created .env"
 else
-  TOKEN="$(grep '^RESET_WEB_TOKEN=' .env 2>/dev/null | sed 's/^RESET_WEB_TOKEN=//' || true)"
+  ADMIN_USER="$(grep '^RESET_ADMIN_USER=' .env 2>/dev/null | sed 's/^RESET_ADMIN_USER=//' || true)"
+  ADMIN_PASSWORD="$(grep '^RESET_ADMIN_PASSWORD=' .env 2>/dev/null | sed 's/^RESET_ADMIN_PASSWORD=//' || true)"
+  if [ -z "$ADMIN_USER" ]; then
+    ADMIN_USER="${RESET_ADMIN_USER:-admin}"
+    printf '\nRESET_ADMIN_USER=%s\n' "$ADMIN_USER" >> .env
+  fi
+  if [ -z "$ADMIN_PASSWORD" ]; then
+    ADMIN_PASSWORD="${RESET_ADMIN_PASSWORD:-$(generate_password)}"
+    printf 'RESET_ADMIN_PASSWORD=%s\n' "$ADMIN_PASSWORD" >> .env
+  fi
   echo ".env already exists; keeping current configuration."
 fi
 
@@ -82,10 +93,11 @@ $COMPOSE up -d --build
 echo
 echo "$APP_NAME is running."
 echo "Web UI: http://$WEB_BIND"
-if [ -n "${TOKEN:-}" ]; then
-  echo "Token: $TOKEN"
+if [ -n "${ADMIN_USER:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
+  echo "Admin user: $ADMIN_USER"
+  echo "Admin password: $ADMIN_PASSWORD"
 else
-  echo "Token: see RESET_WEB_TOKEN in .env"
+  echo "Admin login: see RESET_ADMIN_USER and RESET_ADMIN_PASSWORD in .env"
 fi
 echo
 echo "Logs:"

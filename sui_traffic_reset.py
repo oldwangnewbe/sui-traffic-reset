@@ -11,10 +11,15 @@ from __future__ import annotations
 import argparse
 import calendar
 import contextlib
+from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import base64
+import hashlib
+import hmac
 import io
 import json
 import os
+import secrets
 import sqlite3
 import sys
 import threading
@@ -23,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Sequence
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from zoneinfo import ZoneInfo
 
 
@@ -49,6 +54,13 @@ class Rule:
     timezone: str
     enable_after_reset: bool
     next_reset: int
+
+
+@dataclass
+class AuthUser:
+    username: str
+    role: str
+    client_names: list[str]
 
 
 def connect(db_path: str) -> sqlite3.Connection:
@@ -107,6 +119,173 @@ def ensure_rule_schema(conn: sqlite3.Connection) -> None:
         """
     )
     conn.commit()
+
+
+def ensure_auth_schema(conn: sqlite3.Connection, admin_user: str, admin_password: str) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sui_traffic_reset_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            client_names TEXT NOT NULL DEFAULT '[]',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+        """
+    )
+    now_ts = int(time.time())
+    existing = conn.execute(
+        "SELECT id FROM sui_traffic_reset_accounts WHERE username = ?",
+        (admin_user,),
+    ).fetchone()
+    password_hash = hash_password(admin_password)
+    if existing:
+        conn.execute(
+            """
+            UPDATE sui_traffic_reset_accounts
+            SET password_hash = ?, role = 'admin', client_names = '[]', updated_at = ?
+            WHERE username = ?
+            """,
+            (password_hash, now_ts, admin_user),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO sui_traffic_reset_accounts (
+                username, password_hash, role, client_names, created_at, updated_at
+            )
+            VALUES (?, ?, 'admin', '[]', ?, ?)
+            """,
+            (admin_user, password_hash, now_ts, now_ts),
+        )
+    conn.commit()
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    iterations = 210_000
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return "pbkdf2_sha256${}${}${}".format(
+        iterations,
+        base64.urlsafe_b64encode(salt).decode("ascii"),
+        base64.urlsafe_b64encode(digest).decode("ascii"),
+    )
+
+
+def verify_password(password: str, encoded: str) -> bool:
+    try:
+        algorithm, iterations_raw, salt_raw, digest_raw = encoded.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        salt = base64.urlsafe_b64decode(salt_raw.encode("ascii"))
+        expected = base64.urlsafe_b64decode(digest_raw.encode("ascii"))
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(iterations_raw))
+        return hmac.compare_digest(actual, expected)
+    except Exception:
+        return False
+
+
+def parse_client_names(value: str | None) -> list[str]:
+    if not value:
+        return []
+    try:
+        raw = json.loads(value)
+    except json.JSONDecodeError:
+        raw = [part.strip() for part in value.split(",")]
+    if not isinstance(raw, list):
+        return []
+    names = []
+    for item in raw:
+        name = str(item).strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def account_to_json(row: sqlite3.Row) -> dict[str, object]:
+    return {
+        "username": row["username"],
+        "role": row["role"],
+        "clientNames": parse_client_names(row["client_names"]),
+    }
+
+
+def get_account(conn: sqlite3.Connection, username: str) -> sqlite3.Row | None:
+    return conn.execute(
+        """
+        SELECT username, password_hash, role, client_names
+        FROM sui_traffic_reset_accounts
+        WHERE username = ?
+        """,
+        (username,),
+    ).fetchone()
+
+
+def authenticate_account(conn: sqlite3.Connection, username: str, password: str) -> AuthUser | None:
+    row = get_account(conn, username)
+    if not row or not verify_password(password, row["password_hash"]):
+        return None
+    return AuthUser(
+        username=row["username"],
+        role=row["role"],
+        client_names=parse_client_names(row["client_names"]),
+    )
+
+
+def fetch_accounts(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    rows = conn.execute(
+        """
+        SELECT username, role, client_names
+        FROM sui_traffic_reset_accounts
+        ORDER BY role, username
+        """
+    ).fetchall()
+    return [account_to_json(row) for row in rows]
+
+
+def upsert_account(
+    conn: sqlite3.Connection,
+    *,
+    username: str,
+    password: str,
+    role: str,
+    client_names: Sequence[str],
+) -> None:
+    username = username.strip()
+    if not username:
+        raise ToolError("username is required")
+    if role != "user":
+        raise ToolError("only normal user accounts can be managed here")
+    clean_names = parse_client_names(json.dumps(list(client_names)))
+    now_ts = int(time.time())
+    existing = get_account(conn, username)
+    if existing:
+        if existing["role"] == "admin":
+            raise ToolError("admin account is managed by environment variables")
+        updates = ["role = ?", "client_names = ?", "updated_at = ?"]
+        params: list[object] = [role, json.dumps(clean_names), now_ts]
+        if password:
+            updates.insert(0, "password_hash = ?")
+            params.insert(0, hash_password(password))
+        params.append(username)
+        conn.execute(
+            f"UPDATE sui_traffic_reset_accounts SET {', '.join(updates)} WHERE username = ?",
+            params,
+        )
+    else:
+        if not password:
+            raise ToolError("password is required for new account")
+        conn.execute(
+            """
+            INSERT INTO sui_traffic_reset_accounts (
+                username, password_hash, role, client_names, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (username, hash_password(password), role, json.dumps(clean_names), now_ts, now_ts),
+        )
 
 
 def parse_clock(value: str) -> tuple[int, int]:
@@ -574,10 +753,25 @@ def command_run_due(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     print(f"{'Would reset' if args.dry_run else 'Reset'} {total} client(s) from due rule(s).")
 
 
-def client_to_json(row: sqlite3.Row) -> dict[str, object]:
+def client_next_rule(row: sqlite3.Row, rules: Sequence[Rule]) -> Rule | None:
+    matched = []
+    for rule in rules:
+        if rule.target_type == "all":
+            matched.append(rule)
+        elif rule.target_type == "client" and rule.target_value == row["name"]:
+            matched.append(rule)
+        elif rule.target_type == "group" and rule.target_value == row["group"]:
+            matched.append(rule)
+    if not matched:
+        return None
+    return min(matched, key=lambda rule: rule.next_reset)
+
+
+def client_to_json(row: sqlite3.Row, rules: Sequence[Rule] = ()) -> dict[str, object]:
     up = int(row["up"] or 0)
     down = int(row["down"] or 0)
     volume = int(row["volume"] or 0)
+    next_rule = client_next_rule(row, rules)
     return {
         "id": row["id"],
         "name": row["name"],
@@ -590,6 +784,8 @@ def client_to_json(row: sqlite3.Row) -> dict[str, object]:
         "enable": bool(row["enable"]),
         "usedText": format_size(up + down),
         "volumeText": "unlimited" if volume == 0 else format_size(volume),
+        "nextReset": next_rule.next_reset if next_rule else 0,
+        "nextResetText": datetime.fromtimestamp(next_rule.next_reset).strftime("%Y-%m-%d %H:%M:%S") if next_rule else "",
     }
 
 
@@ -621,12 +817,67 @@ def capture_output(func, *args, **kwargs) -> str:
 
 
 class WebApp:
-    def __init__(self, db_path: str, token: str):
+    def __init__(self, db_path: str, admin_user: str, admin_password: str):
         self.db_path = db_path
-        self.token = token
+        self.admin_user = admin_user
+        self.admin_password = admin_password
+        self.sessions: dict[str, tuple[AuthUser, int]] = {}
+        self.session_lock = threading.Lock()
+        self.session_ttl = 7 * 24 * 3600
 
     def connect(self) -> sqlite3.Connection:
         return connect(self.db_path)
+
+    def create_session(self, user: AuthUser) -> str:
+        token = secrets.token_urlsafe(32)
+        expires = int(time.time()) + self.session_ttl
+        with self.session_lock:
+            self.sessions[token] = (user, expires)
+        return token
+
+    def get_session(self, token: str) -> AuthUser | None:
+        if not token:
+            return None
+        with self.session_lock:
+            data = self.sessions.get(token)
+            if not data:
+                return None
+            user, expires = data
+            if expires < int(time.time()):
+                self.sessions.pop(token, None)
+                return None
+            return user
+
+    def delete_session(self, token: str) -> None:
+        with self.session_lock:
+            self.sessions.pop(token, None)
+
+
+def user_visible_clients(conn: sqlite3.Connection, user: AuthUser) -> list[sqlite3.Row]:
+    if user.role == "admin":
+        return selected_clients(conn, all_clients=True)
+    if not user.client_names:
+        return []
+    return selected_clients(conn, users=user.client_names)
+
+
+def user_visible_rules(conn: sqlite3.Connection, user: AuthUser, clients: Sequence[sqlite3.Row]) -> list[Rule]:
+    rules = fetch_rules(conn)
+    if user.role == "admin":
+        return rules
+    client_names = {str(client["name"]) for client in clients}
+    groups = {str(client["group"]) for client in clients if client["group"]}
+    return [
+        rule for rule in rules
+        if rule.target_type == "all"
+        or (rule.target_type == "client" and rule.target_value in client_names)
+        or (rule.target_type == "group" and rule.target_value in groups)
+    ]
+
+
+def require_admin(user: AuthUser) -> None:
+    if user.role != "admin":
+        raise ToolError("admin permission required")
 
 
 def make_handler(app: WebApp):
@@ -636,11 +887,18 @@ def make_handler(app: WebApp):
         def log_message(self, fmt: str, *args) -> None:
             print(f"{self.address_string()} - {fmt % args}")
 
-        def send_json(self, status: int, payload: dict[str, object]) -> None:
+        def send_json(
+            self,
+            status: int,
+            payload: dict[str, object],
+            extra_headers: dict[str, str] | None = None,
+        ) -> None:
             body = json.dumps(payload).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
+            for key, value in (extra_headers or {}).items():
+                self.send_header(key, value)
             self.end_headers()
             self.wfile.write(body)
 
@@ -658,16 +916,34 @@ def make_handler(app: WebApp):
                 return {}
             return json.loads(self.rfile.read(length).decode("utf-8"))
 
-        def authenticated(self) -> bool:
-            if not app.token:
-                return True
-            return self.headers.get("X-Reset-Token") == app.token
+        def session_token(self) -> str:
+            raw = self.headers.get("Cookie", "")
+            if not raw:
+                return ""
+            jar = cookies.SimpleCookie()
+            jar.load(raw)
+            morsel = jar.get("sui_reset_session")
+            return morsel.value if morsel else ""
 
-        def require_auth(self) -> bool:
-            if self.authenticated():
-                return True
-            self.send_json(401, {"success": False, "error": "invalid token"})
-            return False
+        def current_user(self) -> AuthUser | None:
+            return app.get_session(self.session_token())
+
+        def require_auth(self) -> AuthUser | None:
+            user = self.current_user()
+            if user:
+                return user
+            self.send_json(401, {"success": False, "error": "请先登录"})
+            return None
+
+        def session_cookie(self, token: str, max_age: int | None = None) -> str:
+            cookie = cookies.SimpleCookie()
+            cookie["sui_reset_session"] = token
+            cookie["sui_reset_session"]["path"] = "/"
+            cookie["sui_reset_session"]["httponly"] = True
+            cookie["sui_reset_session"]["samesite"] = "Lax"
+            if max_age is not None:
+                cookie["sui_reset_session"]["max-age"] = str(max_age)
+            return cookie.output(header="").strip()
 
         def do_GET(self) -> None:
             path = urlparse(self.path).path
@@ -677,28 +953,45 @@ def make_handler(app: WebApp):
                     self.send_text(200, fp.read(), "text/html; charset=utf-8")
                 return
             if path == "/api/health":
-                self.send_json(200, {"success": True, "authRequired": bool(app.token)})
+                self.send_json(200, {"success": True, "authRequired": True})
                 return
             if not path.startswith("/api/"):
                 self.send_json(404, {"success": False, "error": "not found"})
                 return
-            if not self.require_auth():
+            user = self.require_auth()
+            if not user:
                 return
             try:
                 with app.connect() as conn:
+                    if path == "/api/me":
+                        self.send_json(200, {
+                            "success": True,
+                            "user": {
+                                "username": user.username,
+                                "role": user.role,
+                                "clientNames": user.client_names,
+                            },
+                        })
+                        return
                     if path == "/api/clients":
                         ensure_sui_schema(conn)
-                        rows = selected_clients(conn, all_clients=True)
+                        rows = user_visible_clients(conn, user)
+                        rules = user_visible_rules(conn, user, rows)
                         groups = sorted({str(row["group"]) for row in rows if row["group"]})
                         self.send_json(200, {
                             "success": True,
-                            "clients": [client_to_json(row) for row in rows],
+                            "clients": [client_to_json(row, rules) for row in rows],
                             "groups": groups,
                         })
                         return
                     if path == "/api/rules":
-                        rules = fetch_rules(conn)
+                        rows = user_visible_clients(conn, user)
+                        rules = user_visible_rules(conn, user, rows)
                         self.send_json(200, {"success": True, "rules": [rule_to_json(rule) for rule in rules]})
+                        return
+                    if path == "/api/accounts":
+                        require_admin(user)
+                        self.send_json(200, {"success": True, "accounts": fetch_accounts(conn)})
                         return
                 self.send_json(404, {"success": False, "error": "not found"})
             except Exception as exc:
@@ -709,12 +1002,52 @@ def make_handler(app: WebApp):
             if not path.startswith("/api/"):
                 self.send_json(404, {"success": False, "error": "not found"})
                 return
-            if not self.require_auth():
-                return
             try:
                 data = self.read_json()
+            except Exception as exc:
+                self.send_json(400, {"success": False, "error": str(exc)})
+                return
+            if path == "/api/login":
+                try:
+                    username = str(data.get("username", "")).strip()
+                    password = str(data.get("password", ""))
+                    with app.connect() as conn:
+                        user = authenticate_account(conn, username, password)
+                    if not user:
+                        self.send_json(401, {"success": False, "error": "用户名或密码错误"})
+                        return
+                    token = app.create_session(user)
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "user": {
+                                "username": user.username,
+                                "role": user.role,
+                                "clientNames": user.client_names,
+                            },
+                        },
+                        {"Set-Cookie": self.session_cookie(token, app.session_ttl)},
+                    )
+                    return
+                except Exception as exc:
+                    self.send_json(500, {"success": False, "error": str(exc)})
+                    return
+            user = self.require_auth()
+            if not user:
+                return
+            try:
                 with app.connect() as conn:
+                    if path == "/api/logout":
+                        app.delete_session(self.session_token())
+                        self.send_json(
+                            200,
+                            {"success": True},
+                            {"Set-Cookie": self.session_cookie("", 0)},
+                        )
+                        return
                     if path == "/api/reset":
+                        require_admin(user)
                         target_type = str(data.get("targetType", ""))
                         target_value = str(data.get("targetValue", ""))
                         rows = clients_for_target(conn, target_type, target_value)
@@ -729,6 +1062,7 @@ def make_handler(app: WebApp):
                         self.send_json(200, {"success": True, "count": len(rows), "output": output})
                         return
                     if path == "/api/expiry":
+                        require_admin(user)
                         target_type = str(data.get("targetType", ""))
                         target_value = str(data.get("targetValue", ""))
                         rows = clients_for_target(conn, target_type, target_value)
@@ -745,6 +1079,7 @@ def make_handler(app: WebApp):
                         self.send_json(200, {"success": True, "count": len(rows), "output": output})
                         return
                     if path == "/api/rules":
+                        require_admin(user)
                         hour, minute = parse_clock(str(data.get("time", "00:00")))
                         next_reset = upsert_rule(
                             conn,
@@ -766,8 +1101,21 @@ def make_handler(app: WebApp):
                         })
                         return
                     if path == "/api/run-due":
+                        require_admin(user)
                         output = capture_output(command_run_due, conn, SimpleNamespace(dry_run=False))
                         self.send_json(200, {"success": True, "output": output})
+                        return
+                    if path == "/api/accounts":
+                        require_admin(user)
+                        upsert_account(
+                            conn,
+                            username=str(data.get("username", "")),
+                            password=str(data.get("password", "")),
+                            role=str(data.get("role", "user")),
+                            client_names=data.get("clientNames", []) if isinstance(data.get("clientNames", []), list) else [],
+                        )
+                        conn.commit()
+                        self.send_json(200, {"success": True})
                         return
                 self.send_json(404, {"success": False, "error": "not found"})
             except Exception as exc:
@@ -775,15 +1123,33 @@ def make_handler(app: WebApp):
 
         def do_DELETE(self) -> None:
             path = urlparse(self.path).path
-            if not self.require_auth():
+            user = self.require_auth()
+            if not user:
                 return
             parts = path.strip("/").split("/")
             if len(parts) == 3 and parts[:2] == ["api", "rules"]:
                 try:
+                    require_admin(user)
                     rule_id = int(parts[2])
                     with app.connect() as conn:
                         ensure_rule_schema(conn)
                         cur = conn.execute("DELETE FROM sui_traffic_reset_rules WHERE id = ?", (rule_id,))
+                        conn.commit()
+                    self.send_json(200, {"success": True, "removed": cur.rowcount})
+                except Exception as exc:
+                    self.send_json(500, {"success": False, "error": str(exc)})
+                return
+            if len(parts) == 3 and parts[:2] == ["api", "accounts"]:
+                try:
+                    require_admin(user)
+                    username = unquote(parts[2])
+                    if username == user.username:
+                        raise ToolError("cannot delete current account")
+                    with app.connect() as conn:
+                        account = get_account(conn, username)
+                        if account and account["role"] == "admin":
+                            raise ToolError("admin account is managed by environment variables")
+                        cur = conn.execute("DELETE FROM sui_traffic_reset_accounts WHERE username = ?", (username,))
                         conn.commit()
                     self.send_json(200, {"success": True, "removed": cur.rowcount})
                 except Exception as exc:
@@ -809,8 +1175,12 @@ def scheduler_loop(db_path: str, interval: int, stop_event: threading.Event) -> 
 def command_serve(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
     ensure_sui_schema(conn)
     ensure_rule_schema(conn)
-    token = os.environ.get("RESET_WEB_TOKEN", "")
-    app = WebApp(args.db, token)
+    admin_user = os.environ.get("RESET_ADMIN_USER", "admin")
+    admin_password = os.environ.get("RESET_ADMIN_PASSWORD", "admin")
+    ensure_auth_schema(conn, admin_user, admin_password)
+    if admin_password == "admin":
+        print("WARNING: RESET_ADMIN_PASSWORD is using the default value; change it before exposing the UI.")
+    app = WebApp(args.db, admin_user, admin_password)
     stop_event = threading.Event()
     scheduler = threading.Thread(
         target=scheduler_loop,
@@ -821,10 +1191,7 @@ def command_serve(conn: sqlite3.Connection, args: argparse.Namespace) -> None:
 
     server = ThreadingHTTPServer((args.host, args.port), make_handler(app))
     print(f"Web UI listening on http://{args.host}:{args.port}")
-    if token:
-        print("Web token authentication is enabled.")
-    else:
-        print("WARNING: RESET_WEB_TOKEN is empty; API authentication is disabled.")
+    print(f"Login authentication is enabled. Admin user: {admin_user}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

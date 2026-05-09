@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>s-ui 流量重置</title>
+  <title>s-ui 用户流量面板</title>
   <style>
     :root {
       color-scheme: light;
-      --bg: #f3f5f8;
+      --bg: #f4f6f8;
       --panel: #ffffff;
       --text: #171a1f;
-      --muted: #68707c;
-      --line: #dfe3e8;
-      --line-soft: #edf0f3;
+      --muted: #667181;
+      --line: #dfe4ea;
+      --soft: #f0f4f8;
       --primary: #1267d3;
       --primary-dark: #0b54ad;
       --danger: #c83232;
       --ok: #177245;
-      --warn: #a16012;
+      --warn: #9a6400;
     }
     * { box-sizing: border-box; }
     body {
@@ -39,15 +39,9 @@
       z-index: 2;
       backdrop-filter: blur(10px);
     }
-    h1 { font-size: 18px; margin: 0; }
-    .brand {
-      display: grid;
-      gap: 2px;
-    }
-    .brand-subtitle {
-      color: var(--muted);
-      font-size: 12px;
-    }
+    h1, h2 { margin: 0; }
+    h1 { font-size: 18px; }
+    h2 { font-size: 16px; }
     main {
       max-width: 1500px;
       margin: 0 auto;
@@ -55,38 +49,22 @@
       display: grid;
       gap: 18px;
     }
-    section {
+    section, .login-card {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 20px;
       box-shadow: 0 10px 30px rgba(20, 35, 60, .045);
     }
-    h2 {
-      margin: 0;
-      font-size: 16px;
-    }
-    .section-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 18px;
-      margin-bottom: 12px;
-    }
-    .section-title {
-      display: grid;
-      gap: 6px;
-      min-width: 220px;
-    }
-    .toolbar, .form-grid {
+    .brand { display: grid; gap: 2px; }
+    .brand-subtitle, .muted { color: var(--muted); }
+    .toolbar, .form-grid, .actions {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       align-items: end;
     }
-    .header-tools {
-      align-items: center;
-    }
+    .header-tools { align-items: center; }
     label {
       display: grid;
       gap: 4px;
@@ -102,25 +80,14 @@
       color: var(--text);
       font: inherit;
     }
-    input, select {
-      min-width: 140px;
-    }
-    input:disabled {
-      background: #f5f7f9;
-      color: #9aa3ad;
-      cursor: not-allowed;
-    }
-    input[type="checkbox"] {
-      height: auto;
-      width: auto;
-    }
+    input, select { min-width: 150px; }
+    input[type="checkbox"] { height: auto; width: auto; min-width: 0; }
     button {
       border-color: transparent;
       background: var(--primary);
       color: #fff;
       cursor: pointer;
-      font-weight: 600;
-      transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+      font-weight: 650;
       box-shadow: 0 1px 1px rgba(10, 65, 130, .08);
     }
     button:hover { background: var(--primary-dark); }
@@ -137,24 +104,29 @@
       box-shadow: none;
     }
     button.danger { background: var(--danger); }
-    button:focus-visible, input:focus-visible, select:focus-visible {
-      outline: 2px solid rgba(11, 101, 194, .22);
-      outline-offset: 2px;
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .hidden { display: none !important; }
+    .login-shell {
+      min-height: calc(100vh - 80px);
+      display: grid;
+      place-items: center;
+      padding: 24px;
     }
-    .actions {
+    .login-card {
+      width: min(420px, 100%);
+      display: grid;
+      gap: 16px;
+    }
+    .login-card input { width: 100%; }
+    .section-head {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      min-width: 250px;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 12px;
     }
-    .actions button {
-      height: 32px;
-      padding: 0 9px;
-    }
-    .status {
-      color: var(--muted);
-      min-height: 22px;
-    }
+    .section-title { display: grid; gap: 6px; min-width: 220px; }
+    .status { color: var(--muted); min-height: 22px; }
     .status.ok { color: var(--ok); }
     .status.err { color: var(--danger); }
     .metrics {
@@ -164,26 +136,21 @@
       margin: 8px 0 14px;
     }
     .metric {
-      border: 1px solid var(--line-soft);
+      border: 1px solid var(--soft);
       background: #fbfcfe;
       border-radius: 8px;
       padding: 12px 14px;
       display: grid;
       gap: 4px;
     }
-    .metric span {
-      color: var(--muted);
-      font-size: 12px;
+    .metric span { color: var(--muted); font-size: 12px; }
+    .metric strong { font-size: 18px; line-height: 1.1; }
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
     }
-    .metric strong {
-      font-size: 18px;
-      line-height: 1.1;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      overflow: hidden;
-    }
+    table { width: 100%; border-collapse: collapse; }
     th, td {
       text-align: left;
       padding: 11px 8px;
@@ -192,90 +159,54 @@
     }
     th {
       color: var(--muted);
-      font-weight: 600;
+      font-weight: 650;
       white-space: nowrap;
       background: #fbfcfe;
     }
-    tbody tr:hover td {
-      background: #fbfcfd;
-    }
-    .table-wrap {
-      overflow-x: auto;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-    }
-    .table-wrap table tr:last-child td {
-      border-bottom: 0;
-    }
-    .usage {
-      display: grid;
-      gap: 5px;
-      min-width: 180px;
-    }
-    .bar {
-      height: 6px;
-      background: var(--line-soft);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-    .bar span {
-      display: block;
-      height: 100%;
-      background: var(--primary);
-    }
+    tbody tr:hover td { background: #fbfcfd; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .usage { display: grid; gap: 5px; min-width: 220px; }
     .usage-line {
       display: flex;
       justify-content: space-between;
       gap: 16px;
       white-space: nowrap;
     }
-    .usage-percent {
-      color: var(--muted);
-      font-size: 12px;
+    .usage-percent { color: var(--muted); font-size: 12px; }
+    .bar {
+      height: 6px;
+      background: var(--soft);
+      border-radius: 999px;
+      overflow: hidden;
     }
+    .bar span { display: block; height: 100%; background: var(--primary); }
     .badge {
       display: inline-flex;
       align-items: center;
-      height: 24px;
-      padding: 0 8px;
+      min-height: 24px;
+      padding: 2px 8px;
       border-radius: 999px;
       background: #eef3f8;
       color: var(--primary-dark);
       white-space: nowrap;
     }
-    .badge.off {
-      background: #f7eaea;
-      color: var(--danger);
-    }
-    .empty {
-      color: var(--muted);
-      text-align: center;
-      padding: 32px 8px;
-    }
-    .muted {
-      color: var(--muted);
-    }
+    .badge.off { background: #f7eaea; color: var(--danger); }
+    .empty { color: var(--muted); text-align: center; padding: 32px 8px; }
     .split {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 16px;
     }
     dialog {
-      width: min(440px, calc(100vw - 32px));
+      width: min(460px, calc(100vw - 32px));
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 0;
       color: var(--text);
       box-shadow: 0 18px 55px rgba(28, 39, 54, .2);
     }
-    dialog::backdrop {
-      background: rgba(17, 24, 39, .35);
-    }
-    .dialog-body {
-      padding: 18px;
-      display: grid;
-      gap: 14px;
-    }
+    dialog::backdrop { background: rgba(17, 24, 39, .35); }
+    .dialog-body { padding: 18px; display: grid; gap: 14px; }
     .dialog-actions {
       display: flex;
       justify-content: flex-end;
@@ -287,9 +218,8 @@
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    @media (max-width: 860px) {
-      header { align-items: flex-start; flex-direction: column; }
-      .section-head { flex-direction: column; }
+    @media (max-width: 920px) {
+      header, .section-head { align-items: flex-start; flex-direction: column; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .split { grid-template-columns: 1fr; }
       .dialog-grid { grid-template-columns: 1fr; }
@@ -298,27 +228,41 @@
       main { padding: 14px; }
       section { padding: 14px; }
       .metrics { grid-template-columns: 1fr; }
-      .toolbar { width: 100%; }
-      .toolbar label, .toolbar input { width: 100%; }
+      .toolbar, .toolbar label, .toolbar input { width: 100%; }
     }
   </style>
 </head>
 <body>
-  <header>
+  <header id="appHeader" class="hidden">
     <div class="brand">
-      <h1>s-ui 流量重置</h1>
-      <div class="brand-subtitle">用户流量、到期时间与定时重置</div>
+      <h1>s-ui 用户流量面板</h1>
+      <div class="brand-subtitle">流量、到期时间与下次刷新</div>
     </div>
     <div class="toolbar header-tools">
-      <label>访问 Token
-        <input id="token" type="password" placeholder="RESET_WEB_TOKEN">
-      </label>
-      <button class="secondary" id="saveToken">保存</button>
-      <button id="refresh">刷新</button>
+      <span id="currentUser" class="badge"></span>
+      <button class="secondary" id="refresh">刷新</button>
+      <button class="ghost" id="logout">退出</button>
     </div>
   </header>
 
-  <main>
+  <div id="loginView" class="login-shell">
+    <form id="loginForm" class="login-card">
+      <div class="brand">
+        <h1>s-ui 用户流量面板</h1>
+        <div class="brand-subtitle">使用管理员或用户账号登录</div>
+      </div>
+      <label>用户名
+        <input id="loginUsername" autocomplete="username" required>
+      </label>
+      <label>密码
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit">登录</button>
+      <div id="loginStatus" class="status"></div>
+    </form>
+  </div>
+
+  <main id="appView" class="hidden">
     <section>
       <div class="section-head">
         <div class="section-title">
@@ -329,28 +273,16 @@
           <label>搜索
             <input id="search" placeholder="用户名或组">
           </label>
-          <button class="secondary" id="ruleFiltered">筛选定时重置</button>
-          <button class="secondary" id="runDue">执行到期</button>
-          <button class="danger" id="resetAll">重置全部</button>
+          <button class="secondary admin-only" id="ruleFiltered">筛选定时重置</button>
+          <button class="secondary admin-only" id="runDue">执行到期规则</button>
+          <button class="danger admin-only" id="resetAll">重置全部</button>
         </div>
       </div>
-      <div class="metrics">
-        <div class="metric">
-          <span>用户</span>
-          <strong id="metricClients">-</strong>
-        </div>
-        <div class="metric">
-          <span>自动规则</span>
-          <strong id="metricRules">-</strong>
-        </div>
-        <div class="metric">
-          <span>停用用户</span>
-          <strong id="metricDisabled">-</strong>
-        </div>
-        <div class="metric">
-          <span>总已用</span>
-          <strong id="metricUsed">-</strong>
-        </div>
+      <div id="metricsPanel" class="metrics admin-only">
+        <div class="metric"><span>用户</span><strong id="metricClients">-</strong></div>
+        <div class="metric"><span id="metricRulesLabel">自动规则</span><strong id="metricRules">-</strong></div>
+        <div class="metric"><span>停用用户</span><strong id="metricDisabled">-</strong></div>
+        <div class="metric"><span>总已用</span><strong id="metricUsed">-</strong></div>
       </div>
       <div class="table-wrap">
         <table>
@@ -361,7 +293,8 @@
               <th>状态</th>
               <th>流量</th>
               <th>到期</th>
-              <th>操作</th>
+              <th>下次刷新</th>
+              <th class="admin-only">操作</th>
             </tr>
           </thead>
           <tbody id="clientsBody"></tbody>
@@ -369,7 +302,7 @@
       </div>
     </section>
 
-    <section>
+    <section id="rulesSection" class="admin-only">
       <div class="section-head">
         <div class="section-title">
           <h2>自动规则</h2>
@@ -383,18 +316,51 @@
               <th>目标</th>
               <th>周期</th>
               <th>下次重置</th>
-              <th>操作</th>
+              <th class="admin-only">操作</th>
             </tr>
           </thead>
           <tbody id="rulesBody"></tbody>
         </table>
       </div>
     </section>
+
+    <section id="accountsSection" class="admin-only">
+      <div class="section-head">
+        <div class="section-title">
+          <h2>登录账号</h2>
+          <div class="status">这里只创建普通用户账号；管理员账号由 .env 管理。绑定多个客户端时用英文逗号分隔。</div>
+        </div>
+      </div>
+      <div class="split">
+        <div>
+          <div class="form-grid">
+            <label>用户名
+              <input id="accountUsername" placeholder="例如 user1">
+            </label>
+            <label>密码
+              <input id="accountPassword" type="password" placeholder="新增必填，编辑可留空">
+            </label>
+            <label>绑定客户端
+              <input id="accountClients" placeholder="1, wang">
+            </label>
+            <button id="saveAccount">保存账号</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>用户名</th><th>角色</th><th>绑定客户端</th><th>操作</th></tr>
+            </thead>
+            <tbody id="accountsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </main>
 
   <dialog id="ruleDialog">
     <div class="dialog-body">
-      <h2 style="margin:0">定时重置</h2>
+      <h2>定时重置</h2>
       <div class="status">当前目标：<strong id="ruleTargetLabel"></strong></div>
       <div class="dialog-grid">
         <label>周期
@@ -429,7 +395,7 @@
 
   <dialog id="expiryDialog">
     <div class="dialog-body">
-      <h2 style="margin:0">设置到期时间</h2>
+      <h2>设置到期时间</h2>
       <div class="status">当前用户：<strong id="expiryClientName"></strong></div>
       <label>到期时间
         <input id="expiryInput" type="datetime-local">
@@ -447,17 +413,29 @@
   </dialog>
 
   <script>
-    const state = { clients: [], rules: [], expiryClient: null, ruleTargets: [] };
+    const state = { user: null, clients: [], rules: [], accounts: [], expiryClient: null, ruleTargets: [] };
     const els = {
-      token: document.querySelector('#token'),
+      appHeader: document.querySelector('#appHeader'),
+      loginView: document.querySelector('#loginView'),
+      appView: document.querySelector('#appView'),
+      loginForm: document.querySelector('#loginForm'),
+      loginUsername: document.querySelector('#loginUsername'),
+      loginPassword: document.querySelector('#loginPassword'),
+      loginStatus: document.querySelector('#loginStatus'),
+      currentUser: document.querySelector('#currentUser'),
       status: document.querySelector('#status'),
       clientsBody: document.querySelector('#clientsBody'),
       rulesBody: document.querySelector('#rulesBody'),
+      accountsBody: document.querySelector('#accountsBody'),
       search: document.querySelector('#search'),
       metricClients: document.querySelector('#metricClients'),
+      metricRulesLabel: document.querySelector('#metricRulesLabel'),
       metricRules: document.querySelector('#metricRules'),
       metricDisabled: document.querySelector('#metricDisabled'),
       metricUsed: document.querySelector('#metricUsed'),
+      accountUsername: document.querySelector('#accountUsername'),
+      accountPassword: document.querySelector('#accountPassword'),
+      accountClients: document.querySelector('#accountClients'),
       ruleDialog: document.querySelector('#ruleDialog'),
       ruleTargetLabel: document.querySelector('#ruleTargetLabel'),
       ruleCycle: document.querySelector('#ruleCycle'),
@@ -472,18 +450,40 @@
       expiryEnable: document.querySelector('#expiryEnable'),
     };
 
-    els.token.value = localStorage.getItem('resetToken') || '';
+    function isAdmin() {
+      return state.user && state.user.role === 'admin';
+    }
+
+    function showApp(user) {
+      state.user = user;
+      els.loginView.classList.add('hidden');
+      els.appHeader.classList.remove('hidden');
+      els.appView.classList.remove('hidden');
+      els.currentUser.textContent = `${user.username} · ${user.role === 'admin' ? '管理员' : '用户'}`;
+      document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
+    }
+
+    function showLogin() {
+      state.user = null;
+      els.loginView.classList.remove('hidden');
+      els.appHeader.classList.add('hidden');
+      els.appView.classList.add('hidden');
+      els.loginPassword.value = '';
+    }
 
     function setStatus(text, type = '') {
       els.status.textContent = text;
       els.status.className = 'status ' + type;
     }
 
+    function setLoginStatus(text, type = '') {
+      els.loginStatus.textContent = text;
+      els.loginStatus.className = 'status ' + type;
+    }
+
     async function api(path, options = {}) {
       const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
-      const token = localStorage.getItem('resetToken') || els.token.value;
-      if (token) headers['X-Reset-Token'] = token;
-      const res = await fetch(path, Object.assign({}, options, { headers }));
+      const res = await fetch(path, Object.assign({ credentials: 'same-origin' }, options, { headers }));
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || '请求失败');
       return data;
@@ -503,21 +503,10 @@
       const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
       let size = Number(value || 0);
       for (const unit of units) {
-        if (Math.abs(size) < 1024 || unit === units[units.length - 1]) {
-          return `${size.toFixed(2)} ${unit}`;
-        }
+        if (Math.abs(size) < 1024 || unit === units[units.length - 1]) return `${size.toFixed(2)} ${unit}`;
         size /= 1024;
       }
       return `${size.toFixed(2)} TiB`;
-    }
-
-    function updateMetrics() {
-      const used = state.clients.reduce((sum, client) => sum + Number(client.used || 0), 0);
-      const disabled = state.clients.filter(client => !client.enable).length;
-      els.metricClients.textContent = state.clients.length;
-      els.metricRules.textContent = state.rules.length;
-      els.metricDisabled.textContent = disabled;
-      els.metricUsed.textContent = sizeFormat(used);
     }
 
     function filteredClients() {
@@ -525,10 +514,29 @@
       return state.clients.filter(c => !q || c.name.toLowerCase().includes(q) || (c.group || '').toLowerCase().includes(q));
     }
 
+    function nextResetSummary() {
+      const timestamps = state.clients
+        .map(client => Number(client.nextReset || 0))
+        .filter(Boolean)
+        .sort((a, b) => a - b);
+      if (!timestamps.length) return '未设置';
+      return new Date(timestamps[0] * 1000).toLocaleString();
+    }
+
+    function updateMetrics() {
+      const used = state.clients.reduce((sum, client) => sum + Number(client.used || 0), 0);
+      els.metricClients.textContent = state.clients.length;
+      els.metricRulesLabel.textContent = isAdmin() ? '自动规则' : '下次刷新';
+      els.metricRules.textContent = isAdmin() ? state.rules.length : nextResetSummary();
+      els.metricDisabled.textContent = state.clients.filter(client => !client.enable).length;
+      els.metricUsed.textContent = sizeFormat(used);
+    }
+
     function renderClients() {
       const rows = filteredClients();
+      const colspan = isAdmin() ? 7 : 6;
       if (!rows.length) {
-        els.clientsBody.innerHTML = '<tr><td class="empty" colspan="6">没有匹配的用户</td></tr>';
+        els.clientsBody.innerHTML = `<tr><td class="empty" colspan="${colspan}">没有匹配的用户</td></tr>`;
         return;
       }
       els.clientsBody.innerHTML = rows.map(c => `
@@ -539,22 +547,26 @@
           <td>
             <div class="usage">
               <div class="usage-line">
-                <span>${c.usedText} / ${c.volumeText}</span>
+                <span>${escapeHtml(c.usedText)} / ${escapeHtml(c.volumeText)}</span>
                 <span class="usage-percent">${c.volume ? percent(c) + '%' : '无限'}</span>
               </div>
               <div class="bar"><span style="width:${percent(c)}%"></span></div>
             </div>
           </td>
           <td>${expiryText(c.expiry)}</td>
-          <td>
-            <div class="actions">
-              <button class="ghost" data-reset="${escapeAttr(c.name)}">重置</button>
-              <button data-rule="${escapeAttr(c.name)}">定时重置</button>
-              <button class="secondary" data-expiry="${escapeAttr(c.name)}">到期</button>
-            </div>
-          </td>
+          <td>${c.nextResetText ? escapeHtml(c.nextResetText) : '未设置'}</td>
+          ${isAdmin() ? `
+            <td>
+              <div class="actions">
+                <button class="ghost" data-reset="${escapeAttr(c.name)}">重置</button>
+                <button data-rule="${escapeAttr(c.name)}">定时重置</button>
+                <button class="secondary" data-expiry="${escapeAttr(c.name)}">到期</button>
+              </div>
+            </td>
+          ` : ''}
         </tr>
       `).join('');
+      if (!isAdmin()) return;
       els.clientsBody.querySelectorAll('[data-reset]').forEach(btn => {
         btn.addEventListener('click', () => resetTarget('client', btn.dataset.reset));
       });
@@ -567,8 +579,9 @@
     }
 
     function renderRules() {
+      const colspan = isAdmin() ? 4 : 3;
       if (!state.rules.length) {
-        els.rulesBody.innerHTML = '<tr><td class="empty" colspan="4">暂无自动规则</td></tr>';
+        els.rulesBody.innerHTML = `<tr><td class="empty" colspan="${colspan}">暂无自动规则</td></tr>`;
         return;
       }
       els.rulesBody.innerHTML = state.rules.map(r => {
@@ -577,26 +590,96 @@
         return `
           <tr>
             <td>${target}</td>
-            <td>${cycle}<br><span style="color:var(--muted)">${escapeHtml(r.timezone)}</span></td>
+            <td>${cycle}<br><span class="muted">${escapeHtml(r.timezone)}</span></td>
             <td>${escapeHtml(r.nextResetText)}</td>
-            <td><button class="danger" data-delete="${r.id}">删除</button></td>
+            ${isAdmin() ? `<td><button class="danger" data-delete="${r.id}">删除</button></td>` : ''}
           </tr>
         `;
       }).join('');
+      if (!isAdmin()) return;
       els.rulesBody.querySelectorAll('[data-delete]').forEach(btn => {
         btn.addEventListener('click', () => deleteRule(btn.dataset.delete));
       });
     }
 
+    function renderAccounts() {
+      if (!isAdmin()) return;
+      if (!state.accounts.length) {
+        els.accountsBody.innerHTML = '<tr><td class="empty" colspan="4">暂无账号</td></tr>';
+        return;
+      }
+      els.accountsBody.innerHTML = state.accounts.map(account => `
+        <tr>
+          <td>${escapeHtml(account.username)}</td>
+          <td>${account.role === 'admin' ? '管理员' : '普通用户'}</td>
+          <td>${escapeHtml((account.clientNames || []).join(', ') || '-')}</td>
+          <td>
+            <div class="actions">
+              ${account.role === 'admin'
+                ? '<span class="muted">由 .env 管理</span>'
+                : `
+                  <button class="secondary" data-edit-account="${escapeAttr(account.username)}">编辑</button>
+                  <button class="danger" data-delete-account="${escapeAttr(account.username)}">删除</button>
+                `}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.accountsBody.querySelectorAll('[data-edit-account]').forEach(btn => {
+        btn.addEventListener('click', () => editAccount(btn.dataset.editAccount));
+      });
+      els.accountsBody.querySelectorAll('[data-delete-account]').forEach(btn => {
+        btn.addEventListener('click', () => deleteAccount(btn.dataset.deleteAccount));
+      });
+    }
+
     async function loadAll() {
       setStatus('正在加载...');
-      const [clients, rules] = await Promise.all([api('/api/clients'), api('/api/rules')]);
+      const [clients, rules, accounts] = await Promise.all([
+        api('/api/clients'),
+        isAdmin() ? api('/api/rules') : Promise.resolve({ rules: [] }),
+        isAdmin() ? api('/api/accounts') : Promise.resolve({ accounts: [] }),
+      ]);
       state.clients = clients.clients;
       state.rules = rules.rules;
+      state.accounts = accounts.accounts;
       updateMetrics();
       renderClients();
-      renderRules();
-      setStatus(`已加载 ${state.clients.length} 个用户、${state.rules.length} 条规则`, 'ok');
+      if (isAdmin()) renderRules();
+      renderAccounts();
+      setStatus(
+        isAdmin()
+          ? `已加载 ${state.clients.length} 个用户、${state.rules.length} 条规则`
+          : `已加载 ${state.clients.length} 个用户`,
+        'ok'
+      );
+    }
+
+    async function login(event) {
+      event.preventDefault();
+      setLoginStatus('正在登录...');
+      const data = await api('/api/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: els.loginUsername.value.trim(), password: els.loginPassword.value })
+      });
+      showApp(data.user);
+      setLoginStatus('');
+      await loadAll();
+    }
+
+    async function bootstrap() {
+      try {
+        const data = await api('/api/me');
+        showApp(data.user);
+        await loadAll();
+      } catch {
+        showLogin();
+      }
+    }
+
+    async function logout() {
+      await api('/api/logout', { method: 'POST', body: '{}' }).catch(() => {});
+      showLogin();
     }
 
     async function resetTarget(targetType, targetValue = '') {
@@ -632,10 +715,7 @@
 
     function openRuleDialogForFiltered() {
       const rows = filteredClients();
-      if (!rows.length) {
-        setStatus('当前筛选没有匹配用户', 'err');
-        return;
-      }
+      if (!rows.length) return setStatus('当前筛选没有匹配用户', 'err');
       state.ruleTargets = rows.map(c => c.name);
       els.ruleTargetLabel.textContent = `筛选用户：${rows.length} 个`;
       updateRuleFieldState();
@@ -649,14 +729,10 @@
     }
 
     async function saveRuleFromDialog() {
-      if (!state.ruleTargets.length) {
-        setStatus('没有选择定时重置目标', 'err');
-        return;
-      }
+      if (!state.ruleTargets.length) return setStatus('没有选择定时重置目标', 'err');
       let lastNextReset = '';
       for (const name of state.ruleTargets) {
-        const payload = currentRulePayload(name);
-        const data = await api('/api/rules', { method: 'POST', body: JSON.stringify(payload) });
+        const data = await api('/api/rules', { method: 'POST', body: JSON.stringify(currentRulePayload(name)) });
         lastNextReset = data.nextResetText;
       }
       const count = state.ruleTargets.length;
@@ -701,15 +777,9 @@
     }
 
     async function saveExpiryFromInput() {
-      if (!els.expiryInput.value) {
-        setStatus('请选择到期时间，或点击“设为无限”', 'err');
-        return;
-      }
+      if (!els.expiryInput.value) return setStatus('请选择到期时间，或点击“设为无限”', 'err');
       const ts = Math.floor(new Date(els.expiryInput.value).getTime() / 1000);
-      if (!Number.isFinite(ts) || ts < 0) {
-        setStatus('到期时间无效', 'err');
-        return;
-      }
+      if (!Number.isFinite(ts) || ts < 0) return setStatus('到期时间无效', 'err');
       await saveExpiry(ts);
     }
 
@@ -726,6 +796,46 @@
       await loadAll();
     }
 
+    function parseClientNames(value) {
+      return value.split(',').map(part => part.trim()).filter(Boolean);
+    }
+
+    async function saveAccount() {
+      const username = els.accountUsername.value.trim();
+      if (!username) return setStatus('请输入账号用户名', 'err');
+      await api('/api/accounts', {
+        method: 'POST',
+        body: JSON.stringify({
+          username,
+          password: els.accountPassword.value,
+          role: 'user',
+          clientNames: parseClientNames(els.accountClients.value),
+        })
+      });
+      els.accountUsername.value = '';
+      els.accountPassword.value = '';
+      els.accountClients.value = '';
+      setStatus('账号已保存', 'ok');
+      await loadAll();
+    }
+
+    function editAccount(username) {
+      const account = state.accounts.find(item => item.username === username);
+      if (!account) return;
+      if (account.role === 'admin') return setStatus('管理员账号由 .env 管理，不能在页面编辑', 'err');
+      els.accountUsername.value = account.username;
+      els.accountPassword.value = '';
+      els.accountClients.value = (account.clientNames || []).join(', ');
+      setStatus('正在编辑账号，密码留空则不修改', 'ok');
+    }
+
+    async function deleteAccount(username) {
+      if (!confirm(`确定删除账号 ${username}？`)) return;
+      await api(`/api/accounts/${encodeURIComponent(username)}`, { method: 'DELETE' });
+      setStatus('账号已删除', 'ok');
+      await loadAll();
+    }
+
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, ch => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -736,15 +846,13 @@
       return escapeHtml(value).replace(/`/g, '&#96;');
     }
 
-    document.querySelector('#saveToken').addEventListener('click', () => {
-      localStorage.setItem('resetToken', els.token.value);
-      setStatus('Token 已保存', 'ok');
-      loadAll().catch(err => setStatus(err.message, 'err'));
-    });
+    els.loginForm.addEventListener('submit', event => login(event).catch(err => setLoginStatus(err.message, 'err')));
+    document.querySelector('#logout').addEventListener('click', () => logout());
     document.querySelector('#refresh').addEventListener('click', () => loadAll().catch(err => setStatus(err.message, 'err')));
     document.querySelector('#resetAll').addEventListener('click', () => resetTarget('all').catch(err => setStatus(err.message, 'err')));
     document.querySelector('#ruleFiltered').addEventListener('click', () => openRuleDialogForFiltered());
     document.querySelector('#runDue').addEventListener('click', () => runDue().catch(err => setStatus(err.message, 'err')));
+    document.querySelector('#saveAccount').addEventListener('click', () => saveAccount().catch(err => setStatus(err.message, 'err')));
     document.querySelector('#ruleCancel').addEventListener('click', () => els.ruleDialog.close());
     document.querySelector('#ruleSave').addEventListener('click', () => saveRuleFromDialog().catch(err => setStatus(err.message, 'err')));
     els.ruleCycle.addEventListener('change', updateRuleFieldState);
@@ -754,7 +862,7 @@
     els.search.addEventListener('input', renderClients);
 
     updateRuleFieldState();
-    loadAll().catch(err => setStatus(err.message + '，请填写并保存 Token', 'err'));
+    bootstrap();
   </script>
 </body>
 </html>
