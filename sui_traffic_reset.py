@@ -63,6 +63,13 @@ class AuthUser:
     client_names: list[str]
 
 
+@dataclass
+class SessionInfo:
+    user: AuthUser
+    expires: int
+    csrf_token: str
+
+
 def connect(db_path: str) -> sqlite3.Connection:
     if not os.path.exists(db_path):
         raise ToolError(f"database not found: {db_path}")
@@ -821,36 +828,61 @@ class WebApp:
         self.db_path = db_path
         self.admin_user = admin_user
         self.admin_password = admin_password
-        self.sessions: dict[str, tuple[AuthUser, int]] = {}
+        self.sessions: dict[str, SessionInfo] = {}
         self.session_lock = threading.Lock()
-        self.session_ttl = 7 * 24 * 3600
+        self.session_ttl = max(300, int(os.environ.get("RESET_SESSION_TTL", str(7 * 24 * 3600))))
+        self.secure_cookie = os.environ.get("RESET_COOKIE_SECURE", "").lower() in {"1", "true", "yes", "on"}
+        self.login_attempts: dict[str, list[int]] = {}
+        self.login_lock = threading.Lock()
+        self.login_window = max(60, int(os.environ.get("RESET_LOGIN_WINDOW", "600")))
+        self.max_login_attempts = max(1, int(os.environ.get("RESET_LOGIN_MAX_ATTEMPTS", "8")))
 
     def connect(self) -> sqlite3.Connection:
         return connect(self.db_path)
 
-    def create_session(self, user: AuthUser) -> str:
+    def create_session(self, user: AuthUser) -> tuple[str, SessionInfo]:
         token = secrets.token_urlsafe(32)
         expires = int(time.time()) + self.session_ttl
+        session = SessionInfo(user=user, expires=expires, csrf_token=secrets.token_urlsafe(32))
         with self.session_lock:
-            self.sessions[token] = (user, expires)
-        return token
+            self.sessions[token] = session
+        return token, session
 
-    def get_session(self, token: str) -> AuthUser | None:
+    def get_session(self, token: str) -> SessionInfo | None:
         if not token:
             return None
         with self.session_lock:
-            data = self.sessions.get(token)
-            if not data:
+            session = self.sessions.get(token)
+            if not session:
                 return None
-            user, expires = data
-            if expires < int(time.time()):
+            if session.expires < int(time.time()):
                 self.sessions.pop(token, None)
                 return None
-            return user
+            return session
 
     def delete_session(self, token: str) -> None:
         with self.session_lock:
             self.sessions.pop(token, None)
+
+    def login_limited(self, client_key: str) -> bool:
+        now = int(time.time())
+        cutoff = now - self.login_window
+        with self.login_lock:
+            attempts = [ts for ts in self.login_attempts.get(client_key, []) if ts >= cutoff]
+            self.login_attempts[client_key] = attempts
+            return len(attempts) >= self.max_login_attempts
+
+    def record_failed_login(self, client_key: str) -> None:
+        now = int(time.time())
+        cutoff = now - self.login_window
+        with self.login_lock:
+            attempts = [ts for ts in self.login_attempts.get(client_key, []) if ts >= cutoff]
+            attempts.append(now)
+            self.login_attempts[client_key] = attempts
+
+    def clear_failed_logins(self, client_key: str) -> None:
+        with self.login_lock:
+            self.login_attempts.pop(client_key, None)
 
 
 def user_visible_clients(conn: sqlite3.Connection, user: AuthUser) -> list[sqlite3.Row]:
@@ -887,6 +919,23 @@ def make_handler(app: WebApp):
         def log_message(self, fmt: str, *args) -> None:
             print(f"{self.address_string()} - {fmt % args}")
 
+        def send_security_headers(self) -> None:
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data:; "
+                "connect-src 'self'; "
+                "base-uri 'none'; "
+                "frame-ancestors 'none'; "
+                "form-action 'self'",
+            )
+
         def send_json(
             self,
             status: int,
@@ -897,6 +946,7 @@ def make_handler(app: WebApp):
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
+            self.send_security_headers()
             for key, value in (extra_headers or {}).items():
                 self.send_header(key, value)
             self.end_headers()
@@ -907,6 +957,7 @@ def make_handler(app: WebApp):
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(data)))
+            self.send_security_headers()
             self.end_headers()
             self.wfile.write(data)
 
@@ -914,6 +965,8 @@ def make_handler(app: WebApp):
             length = int(self.headers.get("Content-Length", "0") or "0")
             if length == 0:
                 return {}
+            if length > 64 * 1024:
+                raise ToolError("request body too large")
             return json.loads(self.rfile.read(length).decode("utf-8"))
 
         def session_token(self) -> str:
@@ -925,22 +978,31 @@ def make_handler(app: WebApp):
             morsel = jar.get("sui_reset_session")
             return morsel.value if morsel else ""
 
-        def current_user(self) -> AuthUser | None:
+        def current_session(self) -> SessionInfo | None:
             return app.get_session(self.session_token())
 
-        def require_auth(self) -> AuthUser | None:
-            user = self.current_user()
-            if user:
-                return user
+        def require_auth(self) -> SessionInfo | None:
+            session = self.current_session()
+            if session:
+                return session
             self.send_json(401, {"success": False, "error": "请先登录"})
             return None
+
+        def require_csrf(self, session: SessionInfo) -> bool:
+            token = self.headers.get("X-CSRF-Token", "")
+            if token and hmac.compare_digest(token, session.csrf_token):
+                return True
+            self.send_json(403, {"success": False, "error": "安全校验失败，请刷新后重试"})
+            return False
 
         def session_cookie(self, token: str, max_age: int | None = None) -> str:
             cookie = cookies.SimpleCookie()
             cookie["sui_reset_session"] = token
             cookie["sui_reset_session"]["path"] = "/"
             cookie["sui_reset_session"]["httponly"] = True
-            cookie["sui_reset_session"]["samesite"] = "Lax"
+            cookie["sui_reset_session"]["samesite"] = "Strict"
+            if app.secure_cookie:
+                cookie["sui_reset_session"]["secure"] = True
             if max_age is not None:
                 cookie["sui_reset_session"]["max-age"] = str(max_age)
             return cookie.output(header="").strip()
@@ -958,9 +1020,10 @@ def make_handler(app: WebApp):
             if not path.startswith("/api/"):
                 self.send_json(404, {"success": False, "error": "not found"})
                 return
-            user = self.require_auth()
-            if not user:
+            session = self.require_auth()
+            if not session:
                 return
+            user = session.user
             try:
                 with app.connect() as conn:
                     if path == "/api/me":
@@ -971,6 +1034,7 @@ def make_handler(app: WebApp):
                                 "role": user.role,
                                 "clientNames": user.client_names,
                             },
+                            "csrfToken": session.csrf_token,
                         })
                         return
                     if path == "/api/clients":
@@ -1009,14 +1073,20 @@ def make_handler(app: WebApp):
                 return
             if path == "/api/login":
                 try:
+                    client_key = self.client_address[0] if self.client_address else "unknown"
+                    if app.login_limited(client_key):
+                        self.send_json(429, {"success": False, "error": "登录失败次数过多，请稍后再试"})
+                        return
                     username = str(data.get("username", "")).strip()
                     password = str(data.get("password", ""))
                     with app.connect() as conn:
                         user = authenticate_account(conn, username, password)
                     if not user:
+                        app.record_failed_login(client_key)
                         self.send_json(401, {"success": False, "error": "用户名或密码错误"})
                         return
-                    token = app.create_session(user)
+                    app.clear_failed_logins(client_key)
+                    token, session = app.create_session(user)
                     self.send_json(
                         200,
                         {
@@ -1026,6 +1096,7 @@ def make_handler(app: WebApp):
                                 "role": user.role,
                                 "clientNames": user.client_names,
                             },
+                            "csrfToken": session.csrf_token,
                         },
                         {"Set-Cookie": self.session_cookie(token, app.session_ttl)},
                     )
@@ -1033,9 +1104,12 @@ def make_handler(app: WebApp):
                 except Exception as exc:
                     self.send_json(500, {"success": False, "error": str(exc)})
                     return
-            user = self.require_auth()
-            if not user:
+            session = self.require_auth()
+            if not session:
                 return
+            if not self.require_csrf(session):
+                return
+            user = session.user
             try:
                 with app.connect() as conn:
                     if path == "/api/logout":
@@ -1123,9 +1197,12 @@ def make_handler(app: WebApp):
 
         def do_DELETE(self) -> None:
             path = urlparse(self.path).path
-            user = self.require_auth()
-            if not user:
+            session = self.require_auth()
+            if not session:
                 return
+            if not self.require_csrf(session):
+                return
+            user = session.user
             parts = path.strip("/").split("/")
             if len(parts) == 3 and parts[:2] == ["api", "rules"]:
                 try:

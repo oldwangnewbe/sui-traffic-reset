@@ -13,14 +13,7 @@
 - Docker Compose 一键部署
 - 用户名密码登录，管理员和普通用户分权
 - 普通用户只查看自己绑定客户端的流量、到期和下次刷新时间
-
-## 截图
-
-打开 Web 控制台后，你可以在用户列表中直接操作当前用户：
-
-- `重置`：立即清零该用户流量
-- `定时重置`：给该用户配置自动重置周期
-- `到期`：修改该用户到期时间
+- HttpOnly 会话 Cookie、CSRF 防护、登录失败限速和基础安全响应头
 
 ## 快速开始
 
@@ -33,7 +26,7 @@
 无需 Git，直接在服务器新建 `docker-compose.yml`：
 
 ```yaml
-# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.1。
+# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.3。
 # 可用版本见：https://github.com/oldwangnewbe/sui-traffic-reset/releases
 services:
   sui-traffic-reset:
@@ -46,6 +39,10 @@ services:
       TZ: Asia/Shanghai
       RESET_ADMIN_USER: admin
       RESET_ADMIN_PASSWORD: please-change-this-password
+      RESET_SESSION_TTL: 604800
+      RESET_LOGIN_MAX_ATTEMPTS: 8
+      RESET_LOGIN_WINDOW: 600
+      RESET_COOKIE_SECURE: 0
       RESET_WEB_PORT: 8080
     ports:
       # 默认只允许服务器本机访问；公网访问可改成 0.0.0.0:8787:8080
@@ -55,28 +52,17 @@ services:
       - /usr/local/s-ui/db:/data
 ```
 
-至少修改两处：
+至少修改 `RESET_ADMIN_PASSWORD`。如果要锁定版本，把 `image` 里的 `latest` 改成版本号，例如 `v0.1.3`。
 
-- 如需固定版本，把 `image` 里的 `latest` 改成版本号，例如 `v0.1.1`
-- `RESET_ADMIN_PASSWORD`
-
-然后启动：
+启动：
 
 ```bash
 docker compose up -d
 ```
 
-下面是从源码部署的方式，适合想自己构建镜像或参与开发的人。
+## 源码部署
 
-一键 Docker Compose 部署：
-
-```bash
-git clone https://github.com/oldwangnewbe/sui-traffic-reset.git
-cd sui-traffic-reset
-./install.sh
-```
-
-手动部署：
+适合想自己构建镜像或参与开发的人：
 
 ```bash
 git clone https://github.com/oldwangnewbe/sui-traffic-reset.git
@@ -101,7 +87,7 @@ docker compose -f docker-compose.image.yml up -d
 指定版本时修改 `.env`：
 
 ```env
-SUI_TRAFFIC_RESET_VERSION=v0.1.1
+SUI_TRAFFIC_RESET_VERSION=v0.1.3
 ```
 
 默认 Web 入口只绑定本机：
@@ -116,10 +102,10 @@ http://127.0.0.1:8787
 RESET_WEB_BIND=0.0.0.0:8787
 ```
 
-然后访问：
+如果页面放在 HTTPS 反向代理后面，建议同时设置：
 
-```text
-http://服务器IP:8787
+```env
+RESET_COOKIE_SECURE=1
 ```
 
 ## Docker Compose 配置
@@ -135,10 +121,12 @@ TZ=Asia/Shanghai
 RESET_ADMIN_USER=admin
 RESET_ADMIN_PASSWORD=please-change-this-password
 RESET_WEB_BIND=127.0.0.1:8787
+RESET_SESSION_TTL=604800
+RESET_LOGIN_MAX_ATTEMPTS=8
+RESET_LOGIN_WINDOW=600
+RESET_COOKIE_SECURE=0
 SUI_TRAFFIC_RESET_VERSION=latest
 ```
-
-字段说明：
 
 | 变量 | 说明 |
 | --- | --- |
@@ -148,6 +136,10 @@ SUI_TRAFFIC_RESET_VERSION=latest
 | `RESET_WEB_BIND` | Web 服务绑定地址 |
 | `RESET_ADMIN_USER` | Web 管理员用户名 |
 | `RESET_ADMIN_PASSWORD` | Web 管理员密码 |
+| `RESET_SESSION_TTL` | 登录会话有效期，单位秒 |
+| `RESET_LOGIN_MAX_ATTEMPTS` | 单个来源在窗口期内允许的失败登录次数 |
+| `RESET_LOGIN_WINDOW` | 登录失败统计窗口，单位秒 |
+| `RESET_COOKIE_SECURE` | 设置为 `1` 时，浏览器只会通过 HTTPS 发送登录 Cookie |
 | `SUI_TRAFFIC_RESET_VERSION` | 使用 `docker-compose.image.yml` 时拉取的镜像版本 |
 
 ## 常用命令
@@ -176,12 +168,6 @@ docker compose run --rm sui-traffic-reset list --all
 docker compose run --rm sui-traffic-reset reset --user wang --enable-after-reset
 ```
 
-手动重置所有用户：
-
-```bash
-docker compose run --rm sui-traffic-reset reset --all --enable-after-reset
-```
-
 添加每月 1 号 00:00 重置所有用户的规则：
 
 ```bash
@@ -200,22 +186,6 @@ docker compose run --rm sui-traffic-reset rule-list
 docker compose run --rm sui-traffic-reset run-due
 ```
 
-## 版本选择
-
-每个 GitHub Release 会对应一个 Git tag，例如 `v0.1.1`。你可以选择源码版本：
-
-```bash
-git fetch --tags
-git checkout v0.1.1
-docker compose up -d --build
-```
-
-也可以选择已发布的 Docker 镜像版本：
-
-```bash
-SUI_TRAFFIC_RESET_VERSION=v0.1.1 docker compose -f docker-compose.image.yml up -d
-```
-
 ## 安全建议
 
 - 第一次部署前备份数据库：
@@ -226,12 +196,13 @@ cp /usr/local/s-ui/db/s-ui.db /usr/local/s-ui/db/s-ui.db.bak
 
 - 不要把 `.env`、`*.db`、`*.db-wal`、`*.db-shm` 提交到 GitHub。
 - 如果公网开放 Web 页面，请使用强管理员密码，并建议套反代 HTTPS。
+- HTTPS 后面请设置 `RESET_COOKIE_SECURE=1`。
 - 本工具直接写 s-ui 数据库，请确认只有可信用户可以访问。
 - 页面里只能创建普通用户账号，管理员账号由 `.env` 管理，避免误创建高权限账号。
 
 ## 工作方式
 
-工具会创建一张独立表：
+工具会创建独立表：
 
 ```text
 sui_traffic_reset_rules

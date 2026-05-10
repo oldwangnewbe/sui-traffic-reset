@@ -413,7 +413,7 @@
   </dialog>
 
   <script>
-    const state = { user: null, clients: [], rules: [], accounts: [], expiryClient: null, ruleTargets: [] };
+    const state = { user: null, csrfToken: '', clients: [], rules: [], accounts: [], expiryClient: null, ruleTargets: [] };
     const els = {
       appHeader: document.querySelector('#appHeader'),
       loginView: document.querySelector('#loginView'),
@@ -454,8 +454,9 @@
       return state.user && state.user.role === 'admin';
     }
 
-    function showApp(user) {
+    function showApp(user, csrfToken = '') {
       state.user = user;
+      state.csrfToken = csrfToken;
       els.loginView.classList.add('hidden');
       els.appHeader.classList.remove('hidden');
       els.appView.classList.remove('hidden');
@@ -465,6 +466,7 @@
 
     function showLogin() {
       state.user = null;
+      state.csrfToken = '';
       els.loginView.classList.remove('hidden');
       els.appHeader.classList.add('hidden');
       els.appView.classList.add('hidden');
@@ -483,6 +485,10 @@
 
     async function api(path, options = {}) {
       const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+      const method = (options.method || 'GET').toUpperCase();
+      if (method !== 'GET' && path !== '/api/login' && state.csrfToken) {
+        headers['X-CSRF-Token'] = state.csrfToken;
+      }
       const res = await fetch(path, Object.assign({ credentials: 'same-origin' }, options, { headers }));
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || '请求失败');
@@ -662,7 +668,7 @@
         method: 'POST',
         body: JSON.stringify({ username: els.loginUsername.value.trim(), password: els.loginPassword.value })
       });
-      showApp(data.user);
+      showApp(data.user, data.csrfToken || '');
       setLoginStatus('');
       await loadAll();
     }
@@ -670,7 +676,7 @@
     async function bootstrap() {
       try {
         const data = await api('/api/me');
-        showApp(data.user);
+        showApp(data.user, data.csrfToken || '');
         await loadAll();
       } catch {
         showLogin();
