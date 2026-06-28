@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Sequence
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 from urllib.parse import unquote, urlparse
 from zoneinfo import ZoneInfo
 
@@ -774,12 +776,16 @@ def client_next_rule(row: sqlite3.Row, rules: Sequence[Rule]) -> Rule | None:
     return min(matched, key=lambda rule: rule.next_reset)
 
 
-def client_to_json(row: sqlite3.Row, rules: Sequence[Rule] = ()) -> dict[str, object]:
+def client_to_json(
+    row: sqlite3.Row,
+    rules: Sequence[Rule] = (),
+    online_ips_by_user: dict[str, list[str]] | None = None,
+) -> dict[str, object]:
     up = int(row["up"] or 0)
     down = int(row["down"] or 0)
     volume = int(row["volume"] or 0)
     next_rule = client_next_rule(row, rules)
-    return {
+    data = {
         "id": row["id"],
         "name": row["name"],
         "group": row["group"],
@@ -794,6 +800,14 @@ def client_to_json(row: sqlite3.Row, rules: Sequence[Rule] = ()) -> dict[str, ob
         "nextReset": next_rule.next_reset if next_rule else 0,
         "nextResetText": datetime.fromtimestamp(next_rule.next_reset).strftime("%Y-%m-%d %H:%M:%S") if next_rule else "",
     }
+    if online_ips_by_user is not None:
+        online_ips = online_ips_by_user.get(str(row["name"]), [])
+        data.update({
+            "online": bool(online_ips),
+            "onlineIps": online_ips,
+            "onlineIpCount": len(online_ips),
+        })
+    return data
 
 
 def rule_to_json(rule: Rule) -> dict[str, object]:
@@ -823,6 +837,105 @@ def capture_output(func, *args, **kwargs) -> str:
     return buf.getvalue().strip()
 
 
+def endpoint_url(base_url: str, action: str) -> str:
+    base = base_url.strip().rstrip("/")
+    if not base:
+        return ""
+    parsed = urlparse(base)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/api") or path.endswith("/apiv2"):
+        return f"{base}/{action}"
+    return f"{base}/apiv2/{action}"
+
+
+def collect_ip_strings(value: object) -> list[str]:
+    result: list[str] = []
+    if isinstance(value, str):
+        text = value.strip()
+        if text:
+            result.append(text)
+    elif isinstance(value, list):
+        for item in value:
+            result.extend(collect_ip_strings(item))
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if isinstance(item, (bool, int, float)):
+                text = str(key).strip()
+                if text:
+                    result.append(text)
+            result.extend(collect_ip_strings(item))
+    return result
+
+
+def normalize_online_ips(payload: object) -> dict[str, list[str]]:
+    if isinstance(payload, dict) and "obj" in payload:
+        payload = payload.get("obj")
+    if not isinstance(payload, dict):
+        return {}
+    online: dict[str, list[str]] = {}
+    for user, value in payload.items():
+        name = str(user).strip()
+        if not name:
+            continue
+        ips = sorted(set(collect_ip_strings(value)))
+        online[name] = ips
+    return online
+
+
+class SuiOnlineClient:
+    def __init__(self) -> None:
+        self.base_url = os.environ.get("SUI_PANEL_URL", "").strip()
+        self.token = os.environ.get("SUI_API_TOKEN", "").strip()
+        self.timeout = max(1.0, float(os.environ.get("SUI_API_TIMEOUT", "3")))
+        self.cache_ttl = max(1, int(os.environ.get("SUI_ONLINE_CACHE_TTL", "5")))
+        self.cache_at = 0
+        self.cache: dict[str, list[str]] = {}
+        self.cache_error = ""
+        self.lock = threading.Lock()
+
+    def enabled(self) -> bool:
+        return bool(self.base_url and self.token)
+
+    def get_online_ips(self) -> tuple[dict[str, list[str]] | None, str]:
+        if not self.enabled():
+            return None, ""
+        now = int(time.time())
+        with self.lock:
+            if self.cache_at and now - self.cache_at < self.cache_ttl:
+                return self.cache, self.cache_error
+        try:
+            data = self.fetch_online_ips()
+            error = ""
+        except Exception as exc:
+            data = {}
+            error = str(exc)
+        with self.lock:
+            self.cache = data
+            self.cache_error = error
+            self.cache_at = now
+        return data, error
+
+    def fetch_online_ips(self) -> dict[str, list[str]]:
+        url = endpoint_url(self.base_url, "onlineIps")
+        req = urllib_request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "Token": self.token,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        )
+        try:
+            with urllib_request.urlopen(req, timeout=self.timeout) as resp:
+                raw = resp.read(512 * 1024)
+        except urllib_error.URLError as exc:
+            raise ToolError(f"s-ui online API unavailable: {exc}") from exc
+        payload = json.loads(raw.decode("utf-8"))
+        if isinstance(payload, dict) and payload.get("success") is False:
+            raise ToolError(str(payload.get("msg") or "s-ui online API returned failed"))
+        return normalize_online_ips(payload)
+
+
 class WebApp:
     def __init__(self, db_path: str, admin_user: str, admin_password: str):
         self.db_path = db_path
@@ -836,6 +949,7 @@ class WebApp:
         self.login_lock = threading.Lock()
         self.login_window = max(60, int(os.environ.get("RESET_LOGIN_WINDOW", "600")))
         self.max_login_attempts = max(1, int(os.environ.get("RESET_LOGIN_MAX_ATTEMPTS", "8")))
+        self.sui_online = SuiOnlineClient()
 
     def connect(self) -> sqlite3.Connection:
         return connect(self.db_path)
@@ -1042,10 +1156,16 @@ def make_handler(app: WebApp):
                         rows = user_visible_clients(conn, user)
                         rules = user_visible_rules(conn, user, rows)
                         groups = sorted({str(row["group"]) for row in rows if row["group"]})
+                        online_ips = None
+                        online_error = ""
+                        if user.role == "admin":
+                            online_ips, online_error = app.sui_online.get_online_ips()
                         self.send_json(200, {
                             "success": True,
-                            "clients": [client_to_json(row, rules) for row in rows],
+                            "clients": [client_to_json(row, rules, online_ips) for row in rows],
                             "groups": groups,
+                            "onlineConfigured": app.sui_online.enabled(),
+                            "onlineError": online_error,
                         })
                         return
                     if path == "/api/rules":

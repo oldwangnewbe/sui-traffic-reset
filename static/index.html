@@ -191,6 +191,21 @@
       white-space: nowrap;
     }
     .badge.off { background: #f7eaea; color: var(--danger); }
+    .badge.online { background: #e9f7ef; color: var(--ok); }
+    .online-detail summary {
+      cursor: pointer;
+      list-style: none;
+      width: max-content;
+    }
+    .online-detail summary::-webkit-details-marker { display: none; }
+    .ip-list {
+      margin-top: 6px;
+      display: grid;
+      gap: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
     .empty { color: var(--muted); text-align: center; padding: 32px 8px; }
     .split {
       display: grid;
@@ -291,6 +306,7 @@
               <th>名称</th>
               <th>组</th>
               <th>状态</th>
+              <th class="admin-only">在线</th>
               <th>流量</th>
               <th>到期</th>
               <th>下次刷新</th>
@@ -540,7 +556,7 @@
 
     function renderClients() {
       const rows = filteredClients();
-      const colspan = isAdmin() ? 7 : 6;
+      const colspan = isAdmin() ? 8 : 6;
       if (!rows.length) {
         els.clientsBody.innerHTML = `<tr><td class="empty" colspan="${colspan}">没有匹配的用户</td></tr>`;
         return;
@@ -550,6 +566,7 @@
           <td>${escapeHtml(c.name)}</td>
           <td>${escapeHtml(c.group || '-')}</td>
           <td><span class="badge ${c.enable ? '' : 'off'}">${c.enable ? '启用' : '停用'}</span></td>
+          ${isAdmin() ? `<td>${onlineHtml(c)}</td>` : ''}
           <td>
             <div class="usage">
               <div class="usage-line">
@@ -582,6 +599,22 @@
       els.clientsBody.querySelectorAll('[data-expiry]').forEach(btn => {
         btn.addEventListener('click', () => openExpiryDialog(btn.dataset.expiry));
       });
+    }
+
+    function onlineHtml(client) {
+      if (!Object.prototype.hasOwnProperty.call(client, 'online')) {
+        return '<span class="muted">未配置</span>';
+      }
+      const ips = Array.isArray(client.onlineIps) ? client.onlineIps : [];
+      if (!ips.length) return '<span class="badge off">离线</span>';
+      return `
+        <details class="online-detail">
+          <summary><span class="badge online">在线 ${ips.length} IP</span></summary>
+          <div class="ip-list">
+            ${ips.map(ip => `<span>${escapeHtml(ip)}</span>`).join('')}
+          </div>
+        </details>
+      `;
     }
 
     function renderRules() {
@@ -653,11 +686,14 @@
       renderClients();
       if (isAdmin()) renderRules();
       renderAccounts();
+      const onlineCount = state.clients.filter(client => client.online).length;
+      const onlineNote = isAdmin() && clients.onlineConfigured ? `，在线 ${onlineCount} 个用户` : '';
+      const onlineError = isAdmin() && clients.onlineError ? `，在线状态获取失败：${clients.onlineError}` : '';
       setStatus(
         isAdmin()
-          ? `已加载 ${state.clients.length} 个用户、${state.rules.length} 条规则`
+          ? `已加载 ${state.clients.length} 个用户、${state.rules.length} 条规则${onlineNote}${onlineError}`
           : `已加载 ${state.clients.length} 个用户`,
-        'ok'
+        onlineError ? 'err' : 'ok'
       );
     }
 

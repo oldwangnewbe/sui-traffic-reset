@@ -14,8 +14,14 @@ services:
       RESET_LOGIN_MAX_ATTEMPTS: ${RESET_LOGIN_MAX_ATTEMPTS:-8}
       RESET_LOGIN_WINDOW: ${RESET_LOGIN_WINDOW:-600}
       RESET_COOKIE_SECURE: ${RESET_COOKIE_SECURE:-0}
+      SUI_PANEL_URL: ${SUI_PANEL_URL:-}
+      SUI_API_TOKEN: ${SUI_API_TOKEN:-}
+      SUI_API_TIMEOUT: ${SUI_API_TIMEOUT:-3}
+      SUI_ONLINE_CACHE_TTL: ${SUI_ONLINE_CACHE_TTL:-5}
       RESET_WEB_PORT: 8080
     ports:
       - ${RESET_WEB_BIND:-127.0.0.1:8787}:8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
       - ${SUI_DB_DIR:-/usr/local/s-ui/db}:/data

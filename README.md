@@ -14,6 +14,7 @@
 - 用户名密码登录，管理员和普通用户分权
 - 普通用户只查看自己绑定客户端的流量、到期和下次刷新时间
 - HttpOnly 会话 Cookie、CSRF 防护、登录失败限速和基础安全响应头
+- 可选接入原版 s-ui API，管理员可查看用户在线状态、在线 IP 数和 IP 列表
 
 ## 快速开始
 
@@ -26,7 +27,7 @@
 无需 Git，直接在服务器新建 `docker-compose.yml`：
 
 ```yaml
-# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.3。
+# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.4。
 # 可用版本见：https://github.com/oldwangnewbe/sui-traffic-reset/releases
 services:
   sui-traffic-reset:
@@ -43,16 +44,32 @@ services:
       RESET_LOGIN_MAX_ATTEMPTS: 8
       RESET_LOGIN_WINDOW: 600
       RESET_COOKIE_SECURE: 0
+      # 可选：配置后管理员可查看用户在线状态和在线 IP 数。
+      SUI_PANEL_URL: ""
+      SUI_API_TOKEN: ""
+      SUI_API_TIMEOUT: 3
+      SUI_ONLINE_CACHE_TTL: 5
       RESET_WEB_PORT: 8080
     ports:
       # 默认只允许服务器本机访问；公网访问可改成 0.0.0.0:8787:8080
       - 127.0.0.1:8787:8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
       # 如果 s-ui 数据库目录不是默认路径，请修改冒号左侧。
       - /usr/local/s-ui/db:/data
 ```
 
-至少修改 `RESET_ADMIN_PASSWORD`。如果要锁定版本，把 `image` 里的 `latest` 改成版本号，例如 `v0.1.3`。
+至少修改 `RESET_ADMIN_PASSWORD`。如果要锁定版本，把 `image` 里的 `latest` 改成版本号，例如 `v0.1.4`。
+
+如果想显示在线 IP，从原版 s-ui 后台创建 API Token 后设置：
+
+```yaml
+SUI_PANEL_URL: http://host.docker.internal:2095
+SUI_API_TOKEN: 你的-s-ui-API-Token
+```
+
+如果 s-ui 面板有路径前缀，把完整地址填入 `SUI_PANEL_URL`，例如 `http://host.docker.internal:2095/app`。不配置这两项时，在线列会显示“未配置”，其他功能不受影响。
 
 启动：
 
@@ -87,7 +104,7 @@ docker compose -f docker-compose.image.yml up -d
 指定版本时修改 `.env`：
 
 ```env
-SUI_TRAFFIC_RESET_VERSION=v0.1.3
+SUI_TRAFFIC_RESET_VERSION=v0.1.4
 ```
 
 默认 Web 入口只绑定本机：
@@ -125,6 +142,10 @@ RESET_SESSION_TTL=604800
 RESET_LOGIN_MAX_ATTEMPTS=8
 RESET_LOGIN_WINDOW=600
 RESET_COOKIE_SECURE=0
+SUI_PANEL_URL=
+SUI_API_TOKEN=
+SUI_API_TIMEOUT=3
+SUI_ONLINE_CACHE_TTL=5
 SUI_TRAFFIC_RESET_VERSION=latest
 ```
 
@@ -140,6 +161,10 @@ SUI_TRAFFIC_RESET_VERSION=latest
 | `RESET_LOGIN_MAX_ATTEMPTS` | 单个来源在窗口期内允许的失败登录次数 |
 | `RESET_LOGIN_WINDOW` | 登录失败统计窗口，单位秒 |
 | `RESET_COOKIE_SECURE` | 设置为 `1` 时，浏览器只会通过 HTTPS 发送登录 Cookie |
+| `SUI_PANEL_URL` | 原版 s-ui 面板地址，用于读取在线 IP |
+| `SUI_API_TOKEN` | 原版 s-ui API Token，用于调用 `apiv2/onlineIps` |
+| `SUI_API_TIMEOUT` | 读取 s-ui 在线接口的超时秒数 |
+| `SUI_ONLINE_CACHE_TTL` | 在线 IP 缓存秒数，避免频繁请求 s-ui |
 | `SUI_TRAFFIC_RESET_VERSION` | 使用 `docker-compose.image.yml` 时拉取的镜像版本 |
 
 ## 常用命令

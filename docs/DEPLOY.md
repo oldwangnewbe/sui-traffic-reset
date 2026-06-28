@@ -11,7 +11,7 @@ cp /usr/local/s-ui/db/s-ui.db /usr/local/s-ui/db/s-ui.db.bak
 直接在服务器新建 `docker-compose.yml`：
 
 ```yaml
-# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.3。
+# 默认使用最新版 latest；如需固定版本，把 latest 改成 Release 版本，例如 v0.1.4。
 # 可用版本见：https://github.com/oldwangnewbe/sui-traffic-reset/releases
 services:
   sui-traffic-reset:
@@ -28,10 +28,17 @@ services:
       RESET_LOGIN_MAX_ATTEMPTS: 8
       RESET_LOGIN_WINDOW: 600
       RESET_COOKIE_SECURE: 0
+      # 可选：配置后管理员可查看用户在线状态和在线 IP 数。
+      SUI_PANEL_URL: ""
+      SUI_API_TOKEN: ""
+      SUI_API_TIMEOUT: 3
+      SUI_ONLINE_CACHE_TTL: 5
       RESET_WEB_PORT: 8080
     ports:
       # 默认只允许服务器本机访问；公网访问可改成 0.0.0.0:8787:8080
       - 127.0.0.1:8787:8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
       # 如果 s-ui 数据库目录不是默认路径，请修改冒号左侧。
       - /usr/local/s-ui/db:/data
@@ -39,6 +46,7 @@ services:
 
 默认会使用最新版。至少修改 `RESET_ADMIN_PASSWORD`；如果要锁定版本，再把 `image` 里的 `latest` 改成指定版本。
 如果放在 HTTPS 反向代理后面，建议把 `RESET_COOKIE_SECURE` 改成 `1`。
+如果要显示在线 IP，从原版 s-ui 创建 API Token 后设置 `SUI_PANEL_URL=http://host.docker.internal:2095` 和 `SUI_API_TOKEN=...`。
 
 ```bash
 docker compose up -d
@@ -105,7 +113,7 @@ docker compose -f docker-compose.image.yml up -d
 如果要选择固定版本，在 `.env` 里设置：
 
 ```env
-SUI_TRAFFIC_RESET_VERSION=v0.1.3
+SUI_TRAFFIC_RESET_VERSION=v0.1.4
 ```
 
 ## 7. 访问
@@ -143,12 +151,12 @@ docker compose up -d --build
 
 ```bash
 git fetch --tags
-git checkout v0.1.3
+git checkout v0.1.4
 docker compose up -d --build
 ```
 
 如果使用发布镜像，只需要修改 `.env` 中的版本并重启：
 
 ```bash
-SUI_TRAFFIC_RESET_VERSION=v0.1.3 docker compose -f docker-compose.image.yml up -d
+SUI_TRAFFIC_RESET_VERSION=v0.1.4 docker compose -f docker-compose.image.yml up -d
 ```

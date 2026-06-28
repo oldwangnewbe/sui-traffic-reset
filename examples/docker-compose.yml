@@ -15,10 +15,17 @@ services:
       RESET_LOGIN_MAX_ATTEMPTS: 8
       RESET_LOGIN_WINDOW: 600
       RESET_COOKIE_SECURE: 0
+      # 可选：配置后管理员可查看用户在线状态和在线 IP 数。
+      SUI_PANEL_URL: ""
+      SUI_API_TOKEN: ""
+      SUI_API_TIMEOUT: 3
+      SUI_ONLINE_CACHE_TTL: 5
       RESET_WEB_PORT: 8080
     ports:
       # 默认只允许服务器本机访问；公网访问可改成 0.0.0.0:8787:8080
       - 127.0.0.1:8787:8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
       # 如果 s-ui 数据库目录不是默认路径，请修改冒号左侧。
       - /usr/local/s-ui/db:/data
