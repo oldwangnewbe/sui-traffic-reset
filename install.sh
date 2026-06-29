@@ -6,7 +6,7 @@ IMAGE_REPO="${SUI_TRAFFIC_RESET_IMAGE:-oldwangnewbe/sui-traffic-reset}"
 IMAGE_VERSION="${SUI_TRAFFIC_RESET_VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/sui-traffic-reset}"
 DB_DIR="${SUI_DB_DIR:-/usr/local/s-ui/db}"
-WEB_BIND="${RESET_WEB_BIND:-127.0.0.1:8787}"
+WEB_BIND="${RESET_WEB_BIND:-0.0.0.0:8787}"
 TZ_VALUE="${TZ:-Asia/Shanghai}"
 CHECK_INTERVAL_VALUE="${CHECK_INTERVAL:-60}"
 
@@ -126,7 +126,7 @@ services:
       SUI_ONLINE_CACHE_TTL: ${SUI_ONLINE_CACHE_TTL:-5}
       RESET_WEB_PORT: 8080
     ports:
-      - ${RESET_WEB_BIND:-127.0.0.1:8787}:8080
+      - ${RESET_WEB_BIND:-0.0.0.0:8787}:8080
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:

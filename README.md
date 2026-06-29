@@ -30,20 +30,21 @@ bash <(curl -Ls https://raw.githubusercontent.com/oldwangnewbe/sui-traffic-reset
 - 检查 `/usr/local/s-ui/db/s-ui.db`
 - 创建 `/opt/sui-traffic-reset`
 - 自动生成管理员密码
+- 在终端输出初始管理员账号和密码
 - 备份 s-ui 数据库
 - 写入 `docker-compose.yml`
 - 拉取并启动 `oldwangnewbe/sui-traffic-reset:latest`
 
-安装完成后默认只允许服务器本机访问：
+安装完成后可以直接公网访问：
 
 ```text
-http://127.0.0.1:8787
+http://服务器IP:8787
 ```
 
-如果要公网访问，可以这样安装：
+如果只想允许服务器本机访问，可以这样安装：
 
 ```bash
-RESET_WEB_BIND=0.0.0.0:8787 bash <(curl -Ls https://raw.githubusercontent.com/oldwangnewbe/sui-traffic-reset/main/install.sh)
+RESET_WEB_BIND=127.0.0.1:8787 bash <(curl -Ls https://raw.githubusercontent.com/oldwangnewbe/sui-traffic-reset/main/install.sh)
 ```
 
 如果 s-ui 数据库不在默认目录：
@@ -84,7 +85,7 @@ services:
       SUI_ONLINE_CACHE_TTL: 5
       RESET_WEB_PORT: 8080
     ports:
-      - 127.0.0.1:8787:8080
+      - 0.0.0.0:8787:8080
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:

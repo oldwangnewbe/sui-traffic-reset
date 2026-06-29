@@ -20,10 +20,22 @@ bash <(curl -Ls https://raw.githubusercontent.com/oldwangnewbe/sui-traffic-reset
 SUI_DB_DIR=/path/to/s-ui/db bash <(curl -Ls https://raw.githubusercontent.com/oldwangnewbe/sui-traffic-reset/main/install.sh)
 ```
 
-公网访问：
+默认公网访问：
 
 ```bash
-RESET_WEB_BIND=0.0.0.0:8787 bash <(curl -Ls https://raw.githubusercontent.com/oldwangnewbe/sui-traffic-reset/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/oldwangnewbe/sui-traffic-reset/main/install.sh)
+```
+
+安装完成后，脚本会在终端输出初始管理员账号和密码。访问地址：
+
+```text
+http://服务器IP:8787
+```
+
+如果只允许服务器本机访问：
+
+```bash
+RESET_WEB_BIND=127.0.0.1:8787 bash <(curl -Ls https://raw.githubusercontent.com/oldwangnewbe/sui-traffic-reset/main/install.sh)
 ```
 
 固定版本：
@@ -56,7 +68,7 @@ services:
       SUI_ONLINE_CACHE_TTL: 5
       RESET_WEB_PORT: 8080
     ports:
-      - 127.0.0.1:8787:8080
+      - 0.0.0.0:8787:8080
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:
