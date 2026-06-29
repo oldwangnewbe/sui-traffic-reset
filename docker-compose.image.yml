@@ -1,6 +1,6 @@
 services:
   sui-traffic-reset:
-    image: ghcr.io/oldwangnewbe/sui-traffic-reset:${SUI_TRAFFIC_RESET_VERSION:-latest}
+    image: ${SUI_TRAFFIC_RESET_IMAGE:-oldwangnewbe/sui-traffic-reset}:${SUI_TRAFFIC_RESET_VERSION:-latest}
     container_name: sui-traffic-reset
     restart: unless-stopped
     environment:

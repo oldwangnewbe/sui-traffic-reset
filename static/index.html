@@ -4,31 +4,53 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>s-ui 用户流量面板</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f6f8;
-      --panel: #ffffff;
-      --text: #171a1f;
-      --muted: #667181;
-      --line: #dfe4ea;
-      --soft: #f0f4f8;
-      --primary: #1267d3;
-      --primary-dark: #0b54ad;
-      --danger: #c83232;
-      --ok: #177245;
-      --warn: #9a6400;
+      --bg: #f6fbff;
+      --panel: rgba(255, 255, 255, .72);
+      --panel-strong: rgba(255, 255, 255, .9);
+      --text: #151a22;
+      --muted: #647084;
+      --line: rgba(120, 145, 170, .24);
+      --soft: rgba(232, 239, 247, .86);
+      --primary: #1268d7;
+      --primary-dark: #0a55b8;
+      --danger: #c9343b;
+      --ok: #0b8a52;
+      --warn: #a46a00;
+      --shadow: 0 18px 45px rgba(31, 54, 86, .11);
+      --shadow-soft: 0 8px 24px rgba(31, 54, 86, .08);
     }
     * { box-sizing: border-box; }
+    html { min-height: 100%; }
     body {
+      min-height: 100vh;
       margin: 0;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 12% 16%, rgba(125, 211, 252, .28), transparent 32%),
+        radial-gradient(circle at 84% 8%, rgba(196, 181, 253, .28), transparent 30%),
+        linear-gradient(135deg, #f8fbff, #eef7ff 38%, #f7f2ff 68%, #eefdf8);
       color: var(--text);
       font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(15, 23, 42, .055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, .055) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(circle at 50% 22%, #000 0, transparent 74%);
     }
     header {
-      background: rgba(255, 255, 255, .96);
-      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .66);
+      border-bottom: 1px solid rgba(255, 255, 255, .72);
       padding: 14px 28px;
       display: flex;
       align-items: center;
@@ -37,27 +59,63 @@
       position: sticky;
       top: 0;
       z-index: 2;
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(16px) saturate(160%);
+      box-shadow: 0 1px 18px rgba(31, 54, 86, .06);
     }
-    h1, h2 { margin: 0; }
-    h1 { font-size: 18px; }
-    h2 { font-size: 16px; }
+    h1, h2 { margin: 0; letter-spacing: 0; }
+    h1 { font-size: 20px; line-height: 1.25; }
+    h2 { font-size: 17px; line-height: 1.3; }
     main {
+      width: calc(100% - 40px);
       max-width: 1500px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 26px 0;
       display: grid;
       gap: 18px;
     }
     section, .login-card {
       background: var(--panel);
-      border: 1px solid var(--line);
+      border: 1px solid rgba(255, 255, 255, .68);
       border-radius: 8px;
       padding: 20px;
-      box-shadow: 0 10px 30px rgba(20, 35, 60, .045);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(165%);
     }
-    .brand { display: grid; gap: 2px; }
+    .view-tabs {
+      width: max-content;
+      max-width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      border: 1px solid rgba(255, 255, 255, .68);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .58);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(14px) saturate(150%);
+      overflow-x: auto;
+    }
+    .view-tabs button {
+      height: 34px;
+      padding: 0 14px;
+      border-color: transparent;
+      background: transparent;
+      color: var(--muted);
+      box-shadow: none;
+    }
+    .view-tabs button:hover {
+      background: rgba(238, 246, 255, .82);
+      color: var(--primary-dark);
+      transform: none;
+    }
+    .view-tabs button.active {
+      background: linear-gradient(180deg, #1974e8, var(--primary));
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(18, 104, 215, .16);
+    }
+    .brand { display: grid; gap: 3px; }
     .brand-subtitle, .muted { color: var(--muted); }
+    .brand-subtitle { font-weight: 560; }
     .toolbar, .form-grid, .actions {
       display: flex;
       flex-wrap: wrap;
@@ -67,44 +125,62 @@
     .header-tools { align-items: center; }
     label {
       display: grid;
-      gap: 4px;
+      gap: 5px;
       color: var(--muted);
       font-size: 12px;
+      font-weight: 650;
     }
     input, select, button {
-      height: 36px;
-      border-radius: 6px;
+      height: 38px;
+      border-radius: 8px;
       border: 1px solid var(--line);
-      padding: 0 11px;
-      background: #fff;
+      padding: 0 12px;
+      background: rgba(255, 255, 255, .78);
       color: var(--text);
       font: inherit;
+      outline: none;
+      transition: border-color .18s ease, box-shadow .18s ease, background .18s ease, transform .18s ease;
     }
-    input, select { min-width: 150px; }
+    input, select {
+      min-width: 150px;
+      box-shadow: inset 0 1px 2px rgba(31, 54, 86, .05);
+    }
+    input:focus, select:focus {
+      border-color: rgba(18, 104, 215, .45);
+      box-shadow: 0 0 0 3px rgba(18, 104, 215, .12);
+      background: rgba(255, 255, 255, .96);
+    }
     input[type="checkbox"] { height: auto; width: auto; min-width: 0; }
     button {
-      border-color: transparent;
-      background: var(--primary);
+      border-color: rgba(18, 104, 215, .1);
+      background: linear-gradient(180deg, #1974e8, var(--primary));
       color: #fff;
       cursor: pointer;
-      font-weight: 650;
-      box-shadow: 0 1px 1px rgba(10, 65, 130, .08);
+      font-weight: 720;
+      box-shadow: 0 8px 18px rgba(18, 104, 215, .18);
+      white-space: nowrap;
     }
-    button:hover { background: var(--primary-dark); }
+    button:hover { background: linear-gradient(180deg, #1469d8, var(--primary-dark)); transform: translateY(-1px); }
     button.secondary {
-      background: #eef3f8;
+      background: rgba(238, 246, 255, .86);
       color: var(--primary-dark);
-      border-color: #cbd8e5;
-      box-shadow: none;
+      border-color: rgba(90, 138, 186, .28);
+      box-shadow: 0 5px 16px rgba(31, 54, 86, .06);
     }
+    button.secondary:hover { background: rgba(226, 240, 255, .95); }
     button.ghost {
-      background: #fff;
+      background: rgba(255, 255, 255, .62);
       color: #405064;
       border-color: var(--line);
       box-shadow: none;
     }
-    button.danger { background: var(--danger); }
-    button:disabled { opacity: .5; cursor: not-allowed; }
+    button.ghost:hover { background: rgba(255, 255, 255, .92); }
+    button.danger {
+      background: linear-gradient(180deg, #da4048, var(--danger));
+      border-color: rgba(201, 52, 59, .14);
+      box-shadow: 0 8px 18px rgba(201, 52, 59, .16);
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
     .hidden { display: none !important; }
     .login-shell {
       min-height: calc(100vh - 80px);
@@ -113,7 +189,7 @@
       padding: 24px;
     }
     .login-card {
-      width: min(420px, 100%);
+      width: min(430px, 100%);
       display: grid;
       gap: 16px;
     }
@@ -123,75 +199,91 @@
       align-items: flex-start;
       justify-content: space-between;
       gap: 18px;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
-    .section-title { display: grid; gap: 6px; min-width: 220px; }
-    .status { color: var(--muted); min-height: 22px; }
+    .section-title { display: grid; gap: 7px; min-width: 220px; }
+    .status { color: var(--muted); min-height: 22px; font-weight: 570; }
     .status.ok { color: var(--ok); }
     .status.err { color: var(--danger); }
     .metrics {
       display: grid;
       grid-template-columns: repeat(4, minmax(130px, 1fr));
       gap: 10px;
-      margin: 8px 0 14px;
+      margin: 10px 0 16px;
     }
     .metric {
-      border: 1px solid var(--soft);
-      background: #fbfcfe;
+      border: 1px solid rgba(255, 255, 255, .72);
+      background: rgba(255, 255, 255, .52);
       border-radius: 8px;
-      padding: 12px 14px;
+      padding: 14px 15px;
       display: grid;
       gap: 4px;
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(12px) saturate(145%);
     }
-    .metric span { color: var(--muted); font-size: 12px; }
-    .metric strong { font-size: 18px; line-height: 1.1; }
+    .metric span { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .metric strong { font-size: 20px; line-height: 1.12; }
     .table-wrap {
       overflow-x: auto;
       border: 1px solid var(--line);
       border-radius: 8px;
+      background: rgba(255, 255, 255, .48);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .72);
     }
     table { width: 100%; border-collapse: collapse; }
     th, td {
       text-align: left;
-      padding: 11px 8px;
+      padding: 12px 10px;
       border-bottom: 1px solid var(--line);
       vertical-align: middle;
     }
     th {
       color: var(--muted);
-      font-weight: 650;
+      font-weight: 760;
       white-space: nowrap;
-      background: #fbfcfe;
+      background: rgba(255, 255, 255, .42);
     }
-    tbody tr:hover td { background: #fbfcfd; }
+    tbody tr { transition: background .18s ease; }
+    tbody tr:hover td { background: rgba(255, 255, 255, .34); }
     tbody tr:last-child td { border-bottom: 0; }
-    .usage { display: grid; gap: 5px; min-width: 220px; }
+    .cell-name { font-weight: 700; }
+    .usage { display: grid; gap: 6px; min-width: 240px; }
     .usage-line {
       display: flex;
       justify-content: space-between;
       gap: 16px;
       white-space: nowrap;
+      font-weight: 620;
     }
     .usage-percent { color: var(--muted); font-size: 12px; }
     .bar {
       height: 6px;
-      background: var(--soft);
+      background: rgba(226, 233, 241, .88);
       border-radius: 999px;
       overflow: hidden;
     }
-    .bar span { display: block; height: 100%; background: var(--primary); }
+    .bar span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #1f7ae0, #10b981);
+      border-radius: inherit;
+    }
     .badge {
       display: inline-flex;
       align-items: center;
-      min-height: 24px;
-      padding: 2px 8px;
+      min-height: 26px;
+      padding: 3px 9px;
       border-radius: 999px;
-      background: #eef3f8;
+      background: rgba(232, 242, 252, .88);
       color: var(--primary-dark);
       white-space: nowrap;
+      font-weight: 760;
+      justify-self: start;
+      max-width: 100%;
     }
-    .badge.off { background: #f7eaea; color: var(--danger); }
-    .badge.online { background: #e9f7ef; color: var(--ok); }
+    .header-tools .badge { justify-self: stretch; justify-content: center; overflow: hidden; text-overflow: ellipsis; }
+    .badge.off { background: rgba(250, 232, 232, .9); color: var(--danger); }
+    .badge.online { background: rgba(226, 248, 236, .92); color: var(--ok); }
     .online-detail summary {
       cursor: pointer;
       list-style: none;
@@ -205,22 +297,63 @@
       color: var(--muted);
       font-size: 12px;
       white-space: nowrap;
+      padding: 7px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .62);
+      border: 1px solid var(--line);
     }
-    .empty { color: var(--muted); text-align: center; padding: 32px 8px; }
+    .empty { color: var(--muted); text-align: center; padding: 34px 8px; }
     .split {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(280px, .9fr) minmax(420px, 1fr);
       gap: 16px;
+      align-items: start;
+    }
+    .accounts-layout {
+      display: grid;
+      gap: 14px;
+    }
+    .account-form-panel {
+      border: 1px solid rgba(255, 255, 255, .72);
+      background: rgba(255, 255, 255, .5);
+      border-radius: 8px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(12px) saturate(145%);
+    }
+    #accountsSection .form-grid {
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) minmax(220px, 1.45fr) 126px;
+      gap: 12px;
+      align-items: end;
+    }
+    #accountsSection .form-grid input {
+      width: 100%;
+      min-width: 0;
+    }
+    #accountsSection .form-grid button {
+      width: 100%;
+      min-width: 0;
+    }
+    #accountsSection .table-wrap {
+      min-width: 0;
+      background: rgba(255, 255, 255, .5);
+    }
+    #accountsSection th,
+    #accountsSection td {
+      padding: 14px 12px;
     }
     dialog {
-      width: min(460px, calc(100vw - 32px));
-      border: 1px solid var(--line);
+      width: min(480px, calc(100vw - 32px));
+      border: 1px solid rgba(255, 255, 255, .72);
       border-radius: 8px;
       padding: 0;
       color: var(--text);
-      box-shadow: 0 18px 55px rgba(28, 39, 54, .2);
+      background: rgba(255, 255, 255, .86);
+      box-shadow: 0 22px 70px rgba(28, 39, 54, .24);
+      backdrop-filter: blur(18px) saturate(160%);
     }
-    dialog::backdrop { background: rgba(17, 24, 39, .35); }
+    dialog::backdrop { background: rgba(17, 24, 39, .34); backdrop-filter: blur(3px); }
     .dialog-body { padding: 18px; display: grid; gap: 14px; }
     .dialog-actions {
       display: flex;
@@ -233,17 +366,140 @@
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    @media (max-width: 920px) {
+    @media (max-width: 980px) {
       header, .section-head { align-items: flex-start; flex-direction: column; }
+      main { width: calc(100% - 28px); padding: 18px 0; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .split { grid-template-columns: 1fr; }
+      #accountsSection .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #accountsSection .form-grid label:last-of-type { grid-column: 1 / -1; }
       .dialog-grid { grid-template-columns: 1fr; }
     }
-    @media (max-width: 560px) {
-      main { padding: 14px; }
-      section { padding: 14px; }
-      .metrics { grid-template-columns: 1fr; }
+    @media (max-width: 760px) {
+      body { font-size: 13px; }
+      header {
+        position: relative;
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, .54);
+      }
+      header > .brand {
+        width: 100%;
+        min-width: 0;
+      }
+      header h1,
+      header .brand-subtitle {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      h1 { font-size: 18px; }
+      h2 { font-size: 16px; }
+      main {
+        width: calc(100% - 20px);
+        max-width: 720px;
+        padding: 12px 0 18px;
+        gap: 12px;
+      }
+      section, .login-card { padding: 14px; }
+      .view-tabs {
+        width: 100%;
+        padding: 5px;
+      }
+      .view-tabs button {
+        flex: 1 0 auto;
+        padding: 0 10px;
+      }
+      .section-head { gap: 12px; margin-bottom: 12px; }
+      .section-title { min-width: 0; }
       .toolbar, .toolbar label, .toolbar input { width: 100%; }
+      .header-tools {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+      }
+      .header-tools .badge {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .metrics { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .metric { padding: 11px 12px; }
+      .metric strong { font-size: 18px; overflow-wrap: anywhere; }
+      .table-wrap {
+        overflow: visible;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+      table, thead, tbody, tr, th, td { display: block; }
+      thead { display: none; }
+      tbody {
+        display: grid;
+        gap: 10px;
+      }
+      tbody tr {
+        display: grid;
+        gap: 0;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, .72);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, .6);
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(14px) saturate(150%);
+      }
+      th, td {
+        border-bottom: 0;
+        padding: 8px 0;
+      }
+      td {
+        display: grid;
+        grid-template-columns: minmax(74px, .34fr) minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+      }
+      td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 760;
+      }
+      td.empty {
+        display: block;
+        text-align: center;
+      }
+      td.empty::before { content: none; }
+      tbody tr:hover td { background: transparent; }
+      .usage { min-width: 0; width: 100%; }
+      .usage-line {
+        display: grid;
+        gap: 2px;
+        white-space: normal;
+      }
+      .actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        gap: 8px;
+      }
+      .actions button { width: 100%; padding: 0 8px; }
+      #rulesSection .actions,
+      #accountsSection .actions { grid-template-columns: repeat(2, minmax(0, max-content)); justify-content: start; }
+      .form-grid { display: grid; grid-template-columns: 1fr; }
+      #accountsSection .form-grid { grid-template-columns: 1fr; }
+      #accountsSection .form-grid label:last-of-type { grid-column: auto; }
+      .form-grid input, .form-grid button, .form-grid label { width: 100%; }
+    }
+    @media (max-width: 430px) {
+      .login-shell { padding: 12px; }
+      .metrics { grid-template-columns: 1fr; }
+      .header-tools { grid-template-columns: 1fr 74px 74px; gap: 8px; }
+      .header-tools button { padding: 0 8px; }
+      td { grid-template-columns: 68px minmax(0, 1fr); gap: 10px; }
+      .actions { grid-template-columns: 1fr; }
+      #rulesSection .actions,
+      #accountsSection .actions { grid-template-columns: 1fr; }
+      input, select, button { min-width: 0; }
     }
   </style>
 </head>
@@ -278,7 +534,13 @@
   </div>
 
   <main id="appView" class="hidden">
-    <section>
+    <nav id="viewTabs" class="view-tabs admin-only" aria-label="页面模块">
+      <button type="button" class="active" data-view="clients">用户流量</button>
+      <button type="button" data-view="rules">自动规则</button>
+      <button type="button" data-view="accounts">登录账号</button>
+    </nav>
+
+    <section id="clientsSection" data-view-panel="clients">
       <div class="section-head">
         <div class="section-title">
           <h2>用户流量</h2>
@@ -318,7 +580,7 @@
       </div>
     </section>
 
-    <section id="rulesSection" class="admin-only">
+    <section id="rulesSection" class="admin-only" data-view-panel="rules">
       <div class="section-head">
         <div class="section-title">
           <h2>自动规则</h2>
@@ -340,15 +602,15 @@
       </div>
     </section>
 
-    <section id="accountsSection" class="admin-only">
+    <section id="accountsSection" class="admin-only" data-view-panel="accounts">
       <div class="section-head">
         <div class="section-title">
           <h2>登录账号</h2>
           <div class="status">这里只创建普通用户账号；管理员账号由 .env 管理。绑定多个客户端时用英文逗号分隔。</div>
         </div>
       </div>
-      <div class="split">
-        <div>
+      <div class="accounts-layout">
+        <div class="account-form-panel">
           <div class="form-grid">
             <label>用户名
               <input id="accountUsername" placeholder="例如 user1">
@@ -429,11 +691,24 @@
   </dialog>
 
   <script>
-    const state = { user: null, csrfToken: '', clients: [], rules: [], accounts: [], expiryClient: null, ruleTargets: [] };
+    const AUTO_REFRESH_MS = 10000;
+    const state = {
+      user: null,
+      csrfToken: '',
+      clients: [],
+      rules: [],
+      accounts: [],
+      expiryClient: null,
+      ruleTargets: [],
+      refreshTimer: null,
+      refreshInFlight: false,
+      activeView: 'clients',
+    };
     const els = {
       appHeader: document.querySelector('#appHeader'),
       loginView: document.querySelector('#loginView'),
       appView: document.querySelector('#appView'),
+      viewTabs: document.querySelector('#viewTabs'),
       loginForm: document.querySelector('#loginForm'),
       loginUsername: document.querySelector('#loginUsername'),
       loginPassword: document.querySelector('#loginPassword'),
@@ -470,6 +745,18 @@
       return state.user && state.user.role === 'admin';
     }
 
+    function setActiveView(view = 'clients') {
+      state.activeView = isAdmin() ? view : 'clients';
+      document.querySelectorAll('[data-view-panel]').forEach(panel => {
+        panel.classList.toggle('hidden', panel.dataset.viewPanel !== state.activeView);
+      });
+      if (els.viewTabs) {
+        els.viewTabs.querySelectorAll('[data-view]').forEach(button => {
+          button.classList.toggle('active', button.dataset.view === state.activeView);
+        });
+      }
+    }
+
     function showApp(user, csrfToken = '') {
       state.user = user;
       state.csrfToken = csrfToken;
@@ -478,11 +765,15 @@
       els.appView.classList.remove('hidden');
       els.currentUser.textContent = `${user.username} · ${user.role === 'admin' ? '管理员' : '用户'}`;
       document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
+      setActiveView(state.activeView);
+      startAutoRefresh();
     }
 
     function showLogin() {
+      stopAutoRefresh();
       state.user = null;
       state.csrfToken = '';
+      state.activeView = 'clients';
       els.loginView.classList.remove('hidden');
       els.appHeader.classList.add('hidden');
       els.appView.classList.add('hidden');
@@ -497,6 +788,21 @@
     function setLoginStatus(text, type = '') {
       els.loginStatus.textContent = text;
       els.loginStatus.className = 'status ' + type;
+    }
+
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      state.refreshTimer = window.setInterval(() => {
+        refreshClients({ silent: true }).catch(() => {});
+      }, AUTO_REFRESH_MS);
+    }
+
+    function stopAutoRefresh() {
+      if (state.refreshTimer) {
+        window.clearInterval(state.refreshTimer);
+        state.refreshTimer = null;
+      }
+      state.refreshInFlight = false;
     }
 
     async function api(path, options = {}) {
@@ -563,11 +869,11 @@
       }
       els.clientsBody.innerHTML = rows.map(c => `
         <tr>
-          <td>${escapeHtml(c.name)}</td>
-          <td>${escapeHtml(c.group || '-')}</td>
-          <td><span class="badge ${c.enable ? '' : 'off'}">${c.enable ? '启用' : '停用'}</span></td>
-          ${isAdmin() ? `<td>${onlineHtml(c)}</td>` : ''}
-          <td>
+          <td data-label="名称" class="cell-name">${escapeHtml(c.name)}</td>
+          <td data-label="组">${escapeHtml(c.group || '-')}</td>
+          <td data-label="状态"><span class="badge ${c.enable ? '' : 'off'}">${c.enable ? '启用' : '停用'}</span></td>
+          ${isAdmin() ? `<td data-label="在线">${onlineHtml(c)}</td>` : ''}
+          <td data-label="流量">
             <div class="usage">
               <div class="usage-line">
                 <span>${escapeHtml(c.usedText)} / ${escapeHtml(c.volumeText)}</span>
@@ -576,10 +882,10 @@
               <div class="bar"><span style="width:${percent(c)}%"></span></div>
             </div>
           </td>
-          <td>${expiryText(c.expiry)}</td>
-          <td>${c.nextResetText ? escapeHtml(c.nextResetText) : '未设置'}</td>
+          <td data-label="到期">${expiryText(c.expiry)}</td>
+          <td data-label="下次刷新">${c.nextResetText ? escapeHtml(c.nextResetText) : '未设置'}</td>
           ${isAdmin() ? `
-            <td>
+            <td data-label="操作">
               <div class="actions">
                 <button class="ghost" data-reset="${escapeAttr(c.name)}">重置</button>
                 <button data-rule="${escapeAttr(c.name)}">定时重置</button>
@@ -605,16 +911,7 @@
       if (!Object.prototype.hasOwnProperty.call(client, 'online')) {
         return '<span class="muted">未配置</span>';
       }
-      const ips = Array.isArray(client.onlineIps) ? client.onlineIps : [];
-      if (!ips.length) return '<span class="badge off">离线</span>';
-      return `
-        <details class="online-detail">
-          <summary><span class="badge online">在线 ${ips.length} IP</span></summary>
-          <div class="ip-list">
-            ${ips.map(ip => `<span>${escapeHtml(ip)}</span>`).join('')}
-          </div>
-        </details>
-      `;
+      return client.online ? '<span class="badge online">在线</span>' : '<span class="badge off">离线</span>';
     }
 
     function renderRules() {
@@ -628,10 +925,10 @@
         const target = r.targetType === 'all' ? '全部用户' : `${r.targetType === 'client' ? '用户' : '组'}：${escapeHtml(r.targetValue)}`;
         return `
           <tr>
-            <td>${target}</td>
-            <td>${cycle}<br><span class="muted">${escapeHtml(r.timezone)}</span></td>
-            <td>${escapeHtml(r.nextResetText)}</td>
-            ${isAdmin() ? `<td><button class="danger" data-delete="${r.id}">删除</button></td>` : ''}
+            <td data-label="目标">${target}</td>
+            <td data-label="周期">${cycle}<br><span class="muted">${escapeHtml(r.timezone)}</span></td>
+            <td data-label="下次重置">${escapeHtml(r.nextResetText)}</td>
+            ${isAdmin() ? `<td data-label="操作"><div class="actions"><button class="danger" data-delete="${r.id}">删除</button></div></td>` : ''}
           </tr>
         `;
       }).join('');
@@ -649,10 +946,10 @@
       }
       els.accountsBody.innerHTML = state.accounts.map(account => `
         <tr>
-          <td>${escapeHtml(account.username)}</td>
-          <td>${account.role === 'admin' ? '管理员' : '普通用户'}</td>
-          <td>${escapeHtml((account.clientNames || []).join(', ') || '-')}</td>
-          <td>
+          <td data-label="用户名" class="cell-name">${escapeHtml(account.username)}</td>
+          <td data-label="角色">${account.role === 'admin' ? '管理员' : '普通用户'}</td>
+          <td data-label="绑定客户端">${escapeHtml((account.clientNames || []).join(', ') || '-')}</td>
+          <td data-label="操作">
             <div class="actions">
               ${account.role === 'admin'
                 ? '<span class="muted">由 .env 管理</span>'
@@ -674,18 +971,36 @@
 
     async function loadAll() {
       setStatus('正在加载...');
-      const [clients, rules, accounts] = await Promise.all([
-        api('/api/clients'),
+      const [_, rules, accounts] = await Promise.all([
+        refreshClients({ silent: true }),
         isAdmin() ? api('/api/rules') : Promise.resolve({ rules: [] }),
         isAdmin() ? api('/api/accounts') : Promise.resolve({ accounts: [] }),
       ]);
-      state.clients = clients.clients;
       state.rules = rules.rules;
       state.accounts = accounts.accounts;
       updateMetrics();
-      renderClients();
       if (isAdmin()) renderRules();
       renderAccounts();
+      setClientStatus(_);
+    }
+
+    async function refreshClients({ silent = false } = {}) {
+      if (!state.user || state.refreshInFlight) return null;
+      state.refreshInFlight = true;
+      try {
+        const clients = await api('/api/clients');
+        state.clients = clients.clients;
+        updateMetrics();
+        renderClients();
+        if (!silent) setClientStatus(clients);
+        return clients;
+      } finally {
+        state.refreshInFlight = false;
+      }
+    }
+
+    function setClientStatus(clients) {
+      if (!clients) return;
       const onlineCount = state.clients.filter(client => client.online).length;
       const onlineNote = isAdmin() && clients.onlineConfigured ? `，在线 ${onlineCount} 个用户` : '';
       const onlineError = isAdmin() && clients.onlineError ? `，在线状态获取失败：${clients.onlineError}` : '';
@@ -902,6 +1217,9 @@
     document.querySelector('#expiryUnlimited').addEventListener('click', () => saveExpiry(0).catch(err => setStatus(err.message, 'err')));
     document.querySelector('#expirySave').addEventListener('click', () => saveExpiryFromInput().catch(err => setStatus(err.message, 'err')));
     els.search.addEventListener('input', renderClients);
+    els.viewTabs.querySelectorAll('[data-view]').forEach(button => {
+      button.addEventListener('click', () => setActiveView(button.dataset.view));
+    });
 
     updateRuleFieldState();
     bootstrap();

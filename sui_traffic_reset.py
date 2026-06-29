@@ -779,7 +779,7 @@ def client_next_rule(row: sqlite3.Row, rules: Sequence[Rule]) -> Rule | None:
 def client_to_json(
     row: sqlite3.Row,
     rules: Sequence[Rule] = (),
-    online_ips_by_user: dict[str, list[str]] | None = None,
+    online_ips_by_user: dict[str, dict[str, object] | None] | None = None,
 ) -> dict[str, object]:
     up = int(row["up"] or 0)
     down = int(row["down"] or 0)
@@ -801,12 +801,8 @@ def client_to_json(
         "nextResetText": datetime.fromtimestamp(next_rule.next_reset).strftime("%Y-%m-%d %H:%M:%S") if next_rule else "",
     }
     if online_ips_by_user is not None:
-        online_ips = online_ips_by_user.get(str(row["name"]), [])
-        data.update({
-            "online": bool(online_ips),
-            "onlineIps": online_ips,
-            "onlineIpCount": len(online_ips),
-        })
+        name = str(row["name"])
+        data["online"] = name in online_ips_by_user
     return data
 
 
@@ -867,18 +863,45 @@ def collect_ip_strings(value: object) -> list[str]:
     return result
 
 
-def normalize_online_ips(payload: object) -> dict[str, list[str]]:
+def normalize_online_ips(payload: object) -> dict[str, dict[str, object]]:
     if isinstance(payload, dict) and "obj" in payload:
         payload = payload.get("obj")
     if not isinstance(payload, dict):
         return {}
-    online: dict[str, list[str]] = {}
+    online: dict[str, dict[str, object]] = {}
     for user, value in payload.items():
         name = str(user).strip()
         if not name:
             continue
-        ips = sorted(set(collect_ip_strings(value)))
-        online[name] = ips
+        ips = sorted(set(collect_ip_strings(value.get("ips", [])))) if isinstance(value, dict) and "ips" in value else sorted(set(collect_ip_strings(value)))
+        count = len(ips)
+        connections = 0
+        if isinstance(value, dict):
+            with contextlib.suppress(TypeError, ValueError):
+                count = int(value.get("count", count))
+            with contextlib.suppress(TypeError, ValueError):
+                connections = int(value.get("connections", 0))
+        online[name] = {
+            "ips": ips,
+            "count": count,
+            "connections": connections,
+        }
+    return online
+
+
+def normalize_online_users(payload: object) -> dict[str, dict[str, object] | None]:
+    if isinstance(payload, dict) and "obj" in payload:
+        payload = payload.get("obj")
+    users: object = payload
+    if isinstance(payload, dict) and "user" in payload:
+        users = payload.get("user")
+    if not isinstance(users, list):
+        return {}
+    online: dict[str, dict[str, object] | None] = {}
+    for item in users:
+        name = str(item).strip()
+        if name:
+            online[name] = None
     return online
 
 
@@ -889,14 +912,14 @@ class SuiOnlineClient:
         self.timeout = max(1.0, float(os.environ.get("SUI_API_TIMEOUT", "3")))
         self.cache_ttl = max(1, int(os.environ.get("SUI_ONLINE_CACHE_TTL", "5")))
         self.cache_at = 0
-        self.cache: dict[str, list[str]] = {}
+        self.cache: dict[str, dict[str, object] | None] = {}
         self.cache_error = ""
         self.lock = threading.Lock()
 
     def enabled(self) -> bool:
         return bool(self.base_url and self.token)
 
-    def get_online_ips(self) -> tuple[dict[str, list[str]] | None, str]:
+    def get_online_ips(self) -> tuple[dict[str, dict[str, object] | None] | None, str]:
         if not self.enabled():
             return None, ""
         now = int(time.time())
@@ -915,8 +938,8 @@ class SuiOnlineClient:
             self.cache_at = now
         return data, error
 
-    def fetch_online_ips(self) -> dict[str, list[str]]:
-        url = endpoint_url(self.base_url, "onlineIps")
+    def fetch_api(self, action: str) -> object:
+        url = endpoint_url(self.base_url, action)
         req = urllib_request.Request(
             url,
             headers={
@@ -933,7 +956,10 @@ class SuiOnlineClient:
         payload = json.loads(raw.decode("utf-8"))
         if isinstance(payload, dict) and payload.get("success") is False:
             raise ToolError(str(payload.get("msg") or "s-ui online API returned failed"))
-        return normalize_online_ips(payload)
+        return payload
+
+    def fetch_online_ips(self) -> dict[str, dict[str, object] | None]:
+        return normalize_online_users(self.fetch_api("onlines"))
 
 
 class WebApp:
@@ -1127,6 +1153,11 @@ def make_handler(app: WebApp):
                 index_path = os.path.join(STATIC_DIR, "index.html")
                 with open(index_path, "r", encoding="utf-8") as fp:
                     self.send_text(200, fp.read(), "text/html; charset=utf-8")
+                return
+            if path == "/favicon.svg":
+                favicon_path = os.path.join(STATIC_DIR, "favicon.svg")
+                with open(favicon_path, "r", encoding="utf-8") as fp:
+                    self.send_text(200, fp.read(), "image/svg+xml; charset=utf-8")
                 return
             if path == "/api/health":
                 self.send_json(200, {"success": True, "authRequired": True})
